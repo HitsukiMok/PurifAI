@@ -1,3 +1,44 @@
+<<<<<<< HEAD
+"""
+AgentShield Backend — Main Application Entry Point
+Initializes FastAPI, registers routers, and configures middleware.
+"""
+
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from api.routes import chat, user
+from core.config import settings
+
+
+# ── Lifespan (startup / shutdown) ─────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Run startup tasks before the server accepts requests."""
+    print(f"🛡  AgentShield API starting — env: {settings.ENVIRONMENT}")
+    yield
+    print("AgentShield API shutting down.")
+
+
+# ── App factory ───────────────────────────────────────────────────────────────
+app = FastAPI(
+    title="AgentShield API",
+    description="AI agent security monitoring — indirect prompt injection detection.",
+    version="1.0.0",
+    lifespan=lifespan,
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
+)
+
+# ── CORS ──────────────────────────────────────────────────────────────────────
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+=======
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -18,10 +59,22 @@ app = FastAPI(title="PurifAI Backend")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+>>>>>>> 7f3827170d79bfe81bc096700b5471b426f9cc1e
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+<<<<<<< HEAD
+# ── Routers ───────────────────────────────────────────────────────────────────
+app.include_router(chat.router, prefix="/api/chat", tags=["Chat / AI"])
+app.include_router(user.router, prefix="/api/user", tags=["User"])
+
+
+# ── Health check ──────────────────────────────────────────────────────────────
+@app.get("/api/health", tags=["Health"])
+async def health() -> dict:
+    return {"status": "ok", "version": "1.0.0"}
+=======
 MODEL_ID = "ProtectAI/deberta-v3-base-prompt-injection-v2"
 
 # Lazy-loaded model
@@ -62,20 +115,65 @@ async def scan_text(request: ScanRequest):
         
         logger.info(f"Scan complete. Result: {prediction['label']} ({prediction['score']:.4f})")
 
-        return {
+        scan_result = {
             "text": request.text,
             "is_safe": is_safe,
             "label": prediction['label'],
             "confidence": prediction['score']
         }
+
+        # Log to in-memory scan history for dashboard
+        import time
+        scan_entry = {
+            "id": str(uuid.uuid4()),
+            "timestamp": time.time(),
+            "time": datetime.now().strftime("%H:%M:%S"),
+            "text": request.text[:200],
+            "label": prediction['label'],
+            "confidence": prediction['score'],
+            "is_safe": is_safe,
+            "source": "extension-scan",
+        }
+        scan_log.appendleft(scan_entry)
+        scan_metrics["scanned"] += 1
+        if not is_safe:
+            scan_metrics["blocked"] += 1
+        logger.info(f"Scan logged. Total scanned: {scan_metrics['scanned']}, blocked: {scan_metrics['blocked']}")
+
+        return scan_result
     except Exception as e:
         logger.error(f"Inference failed: {e}")
         return {"error": "Inference failed", "exception": str(e)}
 
 
+# ──────────────────────────────────────────────────────────────
+#  In-memory scan log for dashboard
+# ──────────────────────────────────────────────────────────────
+from collections import deque
+import uuid
+
+scan_log = deque(maxlen=100)  # keep last 100 scans
+scan_metrics = {"scanned": 0, "blocked": 0}
+
 @app.get("/")
 def read_root():
     return {"status": "PurifAI Backend is running"}
+
+@app.get("/api/recent-scans")
+async def recent_scans(since: float = 0):
+    """Return scans newer than `since` (unix timestamp in seconds).
+    The dashboard polls this every few seconds.
+    Uses >= comparison to ensure boundary scans are not missed;
+    the frontend deduplicates by scan ID."""
+    results = [s for s in scan_log if s["timestamp"] >= since]
+    return {
+        "scans": list(results),
+        "metrics": scan_metrics,
+    }
+
+@app.get("/api/metrics")
+async def get_metrics():
+    return scan_metrics
 
 
 # ──────────────────────────────────────────────────────────────
@@ -136,3 +234,4 @@ async def feedback_stats():
 
     return {"total_reports": count, "csv_file": CSV_FILE}
 
+>>>>>>> 7f3827170d79bfe81bc096700b5471b426f9cc1e

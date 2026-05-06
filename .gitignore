@@ -51,5 +51,12 @@ htmlcov/
 *.njsproj
 *.sln
 *.sw?
+<<<<<<< blocking-feature
+=======
 
+<<<<<<< frontend-v2
 .agent/*
+=======
+.agent/*
+>>>>>>> main
+>>>>>>> main

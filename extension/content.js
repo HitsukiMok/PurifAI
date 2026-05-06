@@ -1,6 +1,13 @@
 // ── AgentShield Content Script ─────────────────────────────────────────────
-// Injected into the AgentShield dashboard page.
+// Injected into ALL pages in the ISOLATED world.
 // Bridges postMessage (page → extension) and announces presence.
+//
+// Responsibilities:
+// 1. Dashboard connection handshake (for the React command center)
+// 2. Dashboard update forwarding
+// 3. ★ NEW: Bridge for interceptor.js scan requests
+//    interceptor.js (MAIN world) cannot use chrome.runtime.sendMessage,
+//    so it posts messages to us, and we forward them to background.js.
 
 (function () {
   "use strict";
@@ -26,11 +33,12 @@
     } catch (e) { /* service worker may be inactive */ }
   }
 
-  // ── Listen for messages FROM the dashboard page ──────────────────────────
+  // ── Listen for messages FROM the page (dashboard + interceptor) ──────────
   window.addEventListener("message", (event) => {
     if (event.source !== window) return;
     if (!event.data || typeof event.data.type !== "string") return;
 
+    // ── Dashboard update forwarding ──
     if (event.data.type === "AGENTSHIELD_UPDATE") {
       try {
         chrome.runtime.sendMessage(
@@ -40,9 +48,56 @@
       } catch (e) { /* service worker restarting */ }
     }
 
+    // ── Dashboard ping reply ──
     if (event.data.type === "AGENTSHIELD_PING") {
-      // Dashboard is checking if extension is present — reply
       window.postMessage({ type: "AGENTSHIELD_EXTENSION_READY", extensionId: chrome.runtime.id }, "*");
+    }
+
+    // ── ★ Interceptor scan request bridge ──
+    // interceptor.js (MAIN world) sends texts here for scanning.
+    // We forward each text to background.js in parallel, collect results,
+    // and post them back so the interceptor can redact the response.
+    if (event.data.type === "PURIFAI_INTERCEPT_SCAN") {
+      const requestId = event.data.requestId;
+      const texts = event.data.texts || [];
+
+      if (texts.length === 0) {
+        window.postMessage({
+          type: "PURIFAI_INTERCEPT_RESULT",
+          requestId: requestId,
+          results: [],
+        }, "*");
+        return;
+      }
+
+      // Scan all texts in parallel via background.js
+      const promises = texts.map((text) => {
+        return new Promise((resolve) => {
+          try {
+            chrome.runtime.sendMessage(
+              { type: "PURIFAI_SCAN_REQUEST", text: text },
+              (response) => {
+                if (chrome.runtime.lastError || !response || !response.ok) {
+                  // Fail-open: treat scan failure as safe
+                  resolve({ is_safe: true, text: text, confidence: 0 });
+                } else {
+                  resolve(response.data);
+                }
+              }
+            );
+          } catch (e) {
+            resolve({ is_safe: true, text: text, confidence: 0 });
+          }
+        });
+      });
+
+      Promise.all(promises).then((results) => {
+        window.postMessage({
+          type: "PURIFAI_INTERCEPT_RESULT",
+          requestId: requestId,
+          results: results,
+        }, "*");
+      });
     }
   });
 
