@@ -51,3 +51,5 @@ htmlcov/
 *.njsproj
 *.sln
 *.sw?
+
+.agent/*
