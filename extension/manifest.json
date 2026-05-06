@@ -53,6 +53,16 @@
       "run_at": "document_idle"
 =======
       "matches": ["<all_urls>"],
+<<<<<<< blocking-feature
+      "js": ["interceptor.js"],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": ["<all_urls>"],
+=======
+>>>>>>> main
       "js": ["content.js", "scanner.js"],
       "css": ["scanner.css"],
       "run_at": "document_idle",

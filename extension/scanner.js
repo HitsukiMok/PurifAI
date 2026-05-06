@@ -1,6 +1,10 @@
 // ── PurifAI Scanner — Content Script ───────────────────────────────────────
 // Injected into ALL web pages (including iframes via all_frames:true).
 // Routes API calls through the background service worker to bypass CSP.
+<<<<<<< blocking-feature
+// Blocks dangerous content with a confirmation overlay.
+=======
+>>>>>>> main
 
 (function () {
   "use strict";
@@ -12,16 +16,29 @@
   let mutationDebounce = null;
   let lastScannedText = "";
   let activeBanner = null;
+<<<<<<< blocking-feature
+  let activeOverlay = null;
+  let acknowledgedTexts = new Set(); // Track texts user has chosen to proceed on
+=======
+>>>>>>> main
 
   console.log("[PurifAI] Scanner loaded on:", window.location.href);
 
   // ── Scan via background proxy ─────────────────────────────────────────────
   function scanText(text) {
+<<<<<<< blocking-feature
+    return new Promise(function (resolve) {
+      try {
+        chrome.runtime.sendMessage(
+          { type: "PURIFAI_SCAN_REQUEST", text: text },
+          function (response) {
+=======
     return new Promise((resolve) => {
       try {
         chrome.runtime.sendMessage(
           { type: "PURIFAI_SCAN_REQUEST", text: text },
           (response) => {
+>>>>>>> main
             if (chrome.runtime.lastError) {
               console.warn("[PurifAI] sendMessage error:", chrome.runtime.lastError.message);
               resolve(null);
@@ -45,11 +62,19 @@
 
   // ── Send feedback via background proxy ────────────────────────────────────
   function sendFeedback(payload) {
+<<<<<<< blocking-feature
+    return new Promise(function (resolve) {
+      try {
+        chrome.runtime.sendMessage(
+          { type: "PURIFAI_FEEDBACK_REQUEST", payload: payload },
+          function (response) {
+=======
     return new Promise((resolve) => {
       try {
         chrome.runtime.sendMessage(
           { type: "PURIFAI_FEEDBACK_REQUEST", payload: payload },
           (response) => {
+>>>>>>> main
             if (chrome.runtime.lastError) {
               resolve(false);
               return;
@@ -63,10 +88,202 @@
     });
   }
 
+<<<<<<< blocking-feature
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function getRiskLevel(confidence) {
+    var pct = Math.round(confidence * 100);
+    if (pct >= 90) return { level: "CRITICAL", color: "#ff4444", bg: "rgba(255,68,68,0.15)" };
+    if (pct >= 70) return { level: "HIGH", color: "#f87171", bg: "rgba(248,113,113,0.12)" };
+    if (pct >= 50) return { level: "MEDIUM", color: "#fbbf24", bg: "rgba(251,191,36,0.12)" };
+    return { level: "LOW", color: "#4ade80", bg: "rgba(74,222,128,0.12)" };
+  }
+
+  function truncateText(text, maxLen) {
+    if (text.length <= maxLen) return text;
+    return text.substring(0, maxLen) + "…";
+  }
+
+  // ── UI: Show blocking overlay (full-screen confirmation popup) ────────────
+  function showBlockingOverlay(element, data) {
+    console.log("[PurifAI] 🚨 INJECTION BLOCKED! Confidence:", data.confidence);
+
+    // Don't re-block if user already acknowledged this text
+    if (acknowledgedTexts.has(data.text)) {
+      console.log("[PurifAI] User already acknowledged this text, showing warning only.");
+      showWarningBanner(element, data);
+      return;
+    }
+
+    element.classList.add("purifai-danger");
+    removeActiveOverlay();
+    removeActiveBanner();
+
+    var riskPct = Math.round(data.confidence * 100);
+    var risk = getRiskLevel(data.confidence);
+    var previewText = truncateText(escapeHtml(data.text), 200);
+
+    var overlay = document.createElement("div");
+    overlay.className = "purifai-overlay";
+    overlay.setAttribute("id", "purifai-blocking-overlay");
+
+    overlay.innerHTML =
+      '<div class="purifai-overlay-backdrop"></div>' +
+      '<div class="purifai-overlay-card">' +
+        // Header
+        '<div class="purifai-overlay-header">' +
+          '<div class="purifai-overlay-icon-wrap">' +
+            '<div class="purifai-overlay-icon-ring"></div>' +
+            '<div class="purifai-overlay-icon">🛡️</div>' +
+          '</div>' +
+          '<h2 class="purifai-overlay-title">Threat Detected</h2>' +
+          '<p class="purifai-overlay-subtitle">PurifAI has identified a potential prompt injection attack in this content.</p>' +
+        '</div>' +
+
+        // Risk Meter
+        '<div class="purifai-overlay-risk-section">' +
+          '<div class="purifai-overlay-risk-meter">' +
+            '<div class="purifai-overlay-risk-number" style="color:' + risk.color + '">' + riskPct + '%</div>' +
+            '<div class="purifai-overlay-risk-label" style="color:' + risk.color + '">' + risk.level + ' RISK</div>' +
+            '<div class="purifai-overlay-risk-bar-track">' +
+              '<div class="purifai-overlay-risk-bar-fill" style="width:' + riskPct + '%;background:' + risk.color + '"></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+
+        // Details
+        '<div class="purifai-overlay-details">' +
+          '<div class="purifai-overlay-detail-row">' +
+            '<span class="purifai-overlay-detail-label">Classification</span>' +
+            '<span class="purifai-overlay-detail-value" style="color:' + risk.color + '">Prompt Injection</span>' +
+          '</div>' +
+          '<div class="purifai-overlay-detail-row">' +
+            '<span class="purifai-overlay-detail-label">AI Confidence</span>' +
+            '<span class="purifai-overlay-detail-value">' + (data.confidence * 100).toFixed(1) + '%</span>' +
+          '</div>' +
+          '<div class="purifai-overlay-detail-row">' +
+            '<span class="purifai-overlay-detail-label">Model</span>' +
+            '<span class="purifai-overlay-detail-value">DeBERTa v3</span>' +
+          '</div>' +
+        '</div>' +
+
+        // Payload Preview
+        '<div class="purifai-overlay-payload">' +
+          '<div class="purifai-overlay-payload-label">⚠️ Detected Malicious Content</div>' +
+          '<div class="purifai-overlay-payload-text">' + previewText + '</div>' +
+        '</div>' +
+
+        // Action Buttons
+        '<div class="purifai-overlay-actions">' +
+          '<button class="purifai-overlay-btn purifai-overlay-btn-leave" id="purifai-btn-leave">' +
+            '<span class="purifai-btn-icon">🛡️</span>' +
+            '<span class="purifai-btn-text">' +
+              '<span class="purifai-btn-main">Leave This Page</span>' +
+              '<span class="purifai-btn-sub">Recommended — stay safe</span>' +
+            '</span>' +
+          '</button>' +
+          '<button class="purifai-overlay-btn purifai-overlay-btn-proceed" id="purifai-btn-proceed">' +
+            '<span class="purifai-btn-icon">⚠️</span>' +
+            '<span class="purifai-btn-text">' +
+              '<span class="purifai-btn-main">Proceed Anyway</span>' +
+              '<span class="purifai-btn-sub">I understand the risk</span>' +
+            '</span>' +
+          '</button>' +
+        '</div>' +
+
+        // False positive link
+        '<div class="purifai-overlay-footer">' +
+          '<button class="purifai-overlay-fp-btn" id="purifai-btn-fp">Not a real threat? Report false positive</button>' +
+        '</div>' +
+      '</div>';
+
+    // ── Button Handlers ──
+
+    // Leave button: go back or close tab
+    var leaveBtn = overlay.querySelector("#purifai-btn-leave");
+    leaveBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      e.preventDefault();
+      console.log("[PurifAI] User chose to LEAVE.");
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.close();
+      }
+    });
+
+    // Proceed button: remove overlay, let user continue
+    var proceedBtn = overlay.querySelector("#purifai-btn-proceed");
+    proceedBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      e.preventDefault();
+      console.log("[PurifAI] User chose to PROCEED despite risk.");
+      acknowledgedTexts.add(data.text);
+      removeActiveOverlay();
+      element.classList.remove("purifai-danger");
+      // Show a small persistent warning banner instead
+      showWarningBanner(element, data);
+    });
+
+    // False positive button
+    var fpBtn = overlay.querySelector("#purifai-btn-fp");
+    fpBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      e.preventDefault();
+      fpBtn.textContent = "Sending…";
+      fpBtn.disabled = true;
+
+      sendFeedback({
+        text: data.text,
+        model_label: data.label,
+        model_confidence: data.confidence,
+        user_corrected_label: "SAFE",
+      }).then(function (ok) {
+        if (ok) {
+          fpBtn.textContent = "✅ Feedback logged — thanks!";
+          acknowledgedTexts.add(data.text);
+          setTimeout(function () {
+            removeActiveOverlay();
+            element.classList.remove("purifai-danger");
+          }, 1200);
+        } else {
+          fpBtn.textContent = "Error — try again";
+          fpBtn.disabled = false;
+        }
+      });
+    });
+
+    // Prevent clicks on the overlay from passing through
+    overlay.addEventListener("click", function (e) {
+      e.stopPropagation();
+    });
+
+    // Append to top-level document
+    try {
+      var targetDoc = window.top.document;
+      targetDoc.body.appendChild(overlay);
+    } catch (e) {
+      document.body.appendChild(overlay);
+    }
+    activeOverlay = overlay;
+  }
+
+  // ── UI: Show floating toast warning (for acknowledged / lower-risk) ───────
+  function showWarningBanner(element, data) {
+    console.log("[PurifAI] ⚠️ Showing warning banner. Confidence:", data.confidence);
+=======
   // ── UI: Show floating toast warning ───────────────────────────────────────
   function showWarning(element, data) {
     console.log("[PurifAI] 🚨 INJECTION DETECTED! Confidence:", data.confidence);
     element.classList.add("purifai-danger");
+>>>>>>> main
     removeActiveBanner();
 
     var banner = document.createElement("div");
@@ -114,12 +331,18 @@
       });
     });
 
+<<<<<<< blocking-feature
+=======
     // Append to the top-level document body (works even from iframes via try/catch)
+>>>>>>> main
     try {
       var targetDoc = window.top.document;
       targetDoc.body.appendChild(banner);
     } catch (e) {
+<<<<<<< blocking-feature
+=======
       // Cross-origin iframe — append to this frame's body instead
+>>>>>>> main
       document.body.appendChild(banner);
     }
     activeBanner = banner;
@@ -130,6 +353,10 @@
     console.log("[PurifAI] ✅ Text is safe.");
     element.classList.remove("purifai-danger");
     removeActiveBanner();
+<<<<<<< blocking-feature
+    removeActiveOverlay();
+=======
+>>>>>>> main
     element.classList.add("purifai-safe");
     setTimeout(function () { element.classList.remove("purifai-safe"); }, 1500);
   }
@@ -139,13 +366,36 @@
       try { activeBanner.remove(); } catch (e) {}
       activeBanner = null;
     }
+<<<<<<< blocking-feature
+=======
     // Also clean up any orphaned banners
+>>>>>>> main
     try {
       var old = (window.top || window).document.getElementById("purifai-active-banner");
       if (old) old.remove();
     } catch (e) {}
   }
 
+<<<<<<< blocking-feature
+  function removeActiveOverlay() {
+    if (activeOverlay) {
+      try {
+        activeOverlay.classList.add("purifai-overlay-exit");
+        var ref = activeOverlay;
+        setTimeout(function () {
+          try { ref.remove(); } catch (e) {}
+        }, 300);
+      } catch (e) {}
+      activeOverlay = null;
+    }
+    try {
+      var old = (window.top || window).document.getElementById("purifai-blocking-overlay");
+      if (old) old.remove();
+    } catch (e) {}
+  }
+
+=======
+>>>>>>> main
   // ── Core: Handle an input event on any element ────────────────────────────
   function handleInput(element) {
     var text = "";
@@ -181,7 +431,12 @@
       }
 
       if (result.is_safe === false) {
+<<<<<<< blocking-feature
+        // BLOCK with full overlay — not just a warning
+        showBlockingOverlay(element, result);
+=======
         showWarning(element, result);
+>>>>>>> main
       } else {
         showSafe(element);
       }
@@ -208,7 +463,10 @@
   }, true);
 
   // ── Watch contenteditable divs (Gmail, ChatGPT, Claude, etc.) ─────────────
+<<<<<<< blocking-feature
+=======
   // Also watch for keyup events as a fallback for editors that swallow input events
+>>>>>>> main
   document.addEventListener("keyup", function (e) {
     var t = e.target;
     if (!t) return;
@@ -242,4 +500,43 @@
     }
   }, 1000);
 
+<<<<<<< blocking-feature
+  // ── Listen for interceptor-level blocks (network layer) ───────────────────
+  // When interceptor.js (MAIN world) detects and redacts a malicious payload
+  // from a fetch/XHR response, it posts this event so we can show the
+  // blocking overlay to the user.
+  window.addEventListener("message", function (event) {
+    if (event.source !== window) return;
+    if (!event.data || event.data.type !== "PURIFAI_INTERCEPT_BLOCKED") return;
+
+    var blockData = event.data.data;
+    if (!blockData) return;
+
+    console.log("[PurifAI] 🔒 Network-level interception received:", blockData.url);
+
+    // Build a scan result object compatible with showBlockingOverlay
+    var fakeResult = {
+      text: blockData.text || "",
+      confidence: blockData.confidence || 0.99,
+      label: blockData.label || "INJECTION",
+      is_safe: false,
+    };
+
+    // Use document.body as the element since the malicious text was
+    // intercepted at the network level (never hit the DOM)
+    var target = document.body || document.documentElement;
+    showBlockingOverlay(target, fakeResult);
+  });
+
+  // ── Signal to interceptor.js that scanner is ready ────────────────────────
+  // interceptor.js (MAIN world) queues PURIFAI_INTERCEPT_BLOCKED events
+  // until it receives this signal, solving the race condition where
+  // injections are detected during page load before scanner.js is loaded.
+  window.postMessage({ type: "PURIFAI_SCANNER_READY" }, "*");
+  console.log("[PurifAI] Scanner ready — notified interceptor.");
+
 })();
+
+=======
+})();
+>>>>>>> main
