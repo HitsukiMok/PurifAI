@@ -345,11 +345,9 @@ function renderTrafficRows(rows) {
     `;
 
     tr.addEventListener("click", () => {
-      if (blocked) {
-        selectedRow = row;
-        renderInspectPanel(row);
-        renderTrafficRows(currentState?.rows || []);
-      }
+      selectedRow = row;
+      renderInspectPanel(row);
+      renderTrafficRows(currentState?.rows || []);
     });
 
     tbody.appendChild(tr);
@@ -361,9 +359,13 @@ function renderInspectPanel(row) {
   const panel = document.getElementById("inspect-panel");
   if (!panel) return;
   panel.classList.add("visible", "fade-in");
-  document.getElementById("inspect-technique").textContent = row.technique || "Unknown";
+
+  const blocked = row.status === "Blocked";
+  const riskLevel = row.risk >= 80 ? "Critical" : row.risk >= 50 ? "Medium" : "Low";
+
+  document.getElementById("inspect-technique").textContent = row.technique || (blocked ? "Unknown" : "None — Safe");
   document.getElementById("inspect-time").textContent      = row.time;
-  document.getElementById("inspect-risk").textContent      = `${row.risk}% Critical`;
+  document.getElementById("inspect-risk").textContent      = `${row.risk}% ${riskLevel}`;
   document.getElementById("inspect-source").textContent    = shortenSource(row.source || "—");
   document.getElementById("inspect-agent").textContent     = row.agent;
 
@@ -376,8 +378,10 @@ function renderInspectPanel(row) {
         ? escHtml(p) + `<mark>${escHtml(row.payload)}</mark>`
         : escHtml(p)
     ).join("");
+  } else if (row.raw) {
+    payloadEl.textContent = row.raw;
   } else {
-    payloadEl.textContent = row.raw || "—";
+    payloadEl.textContent = blocked ? "No payload captured" : "Content scanned — no threats detected.";
   }
 }
 

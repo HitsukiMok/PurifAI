@@ -77,10 +77,8 @@ function Dashboard() {
   }
 
   function handleSelect(r: TrafficRow) {
-    if (r.status === "Blocked") {
-      setSelected(r);
-      setShowPanel(true);
-    }
+    setSelected(r);
+    setShowPanel(true);
   }
 
   return (

@@ -445,4 +445,39 @@
     }
   }, 1000);
 
+  // ── Listen for interceptor-level blocks (network layer) ───────────────────
+  // When interceptor.js (MAIN world) detects and redacts a malicious payload
+  // from a fetch/XHR response, it posts this event so we can show the
+  // blocking overlay to the user.
+  window.addEventListener("message", function (event) {
+    if (event.source !== window) return;
+    if (!event.data || event.data.type !== "PURIFAI_INTERCEPT_BLOCKED") return;
+
+    var blockData = event.data.data;
+    if (!blockData) return;
+
+    console.log("[PurifAI] 🔒 Network-level interception received:", blockData.url);
+
+    // Build a scan result object compatible with showBlockingOverlay
+    var fakeResult = {
+      text: blockData.text || "",
+      confidence: blockData.confidence || 0.99,
+      label: blockData.label || "INJECTION",
+      is_safe: false,
+    };
+
+    // Use document.body as the element since the malicious text was
+    // intercepted at the network level (never hit the DOM)
+    var target = document.body || document.documentElement;
+    showBlockingOverlay(target, fakeResult);
+  });
+
+  // ── Signal to interceptor.js that scanner is ready ────────────────────────
+  // interceptor.js (MAIN world) queues PURIFAI_INTERCEPT_BLOCKED events
+  // until it receives this signal, solving the race condition where
+  // injections are detected during page load before scanner.js is loaded.
+  window.postMessage({ type: "PURIFAI_SCANNER_READY" }, "*");
+  console.log("[PurifAI] Scanner ready — notified interceptor.");
+
 })();
+
