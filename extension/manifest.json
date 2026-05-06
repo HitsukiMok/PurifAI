@@ -1,24 +1,43 @@
 {
   "manifest_version": 3,
+<<<<<<< HEAD
   "name": "AgentShield — AI Security Monitor",
   "short_name": "AgentShield",
   "description": "Real-time monitoring of indirect prompt injection attacks. Mini-dashboard for your AgentShield Platform.",
+=======
+  "name": "PurifAI Shield",
+  "short_name": "PurifAI",
+  "description": "Real-time AI protection against prompt injections. Powered by DeBERTa v3.",
+>>>>>>> 7f3827170d79bfe81bc096700b5471b426f9cc1e
   "version": "1.0.0",
 
   "permissions": ["storage", "activeTab", "scripting", "tabs"],
   "host_permissions": [
     "http://localhost:*/*",
+<<<<<<< HEAD
     "https://*.agentshield.io/*"
   ],
 
   "background": {
     "service_worker": "background.js",
     "type": "module"
+=======
+    "https://*.agentshield.io/*",
+    "<all_urls>"
+  ],
+
+  "background": {
+    "service_worker": "background.js"
+>>>>>>> 7f3827170d79bfe81bc096700b5471b426f9cc1e
   },
 
   "action": {
     "default_popup": "popup.html",
+<<<<<<< HEAD
     "default_title": "AgentShield Monitor",
+=======
+    "default_title": "PurifAI Shield",
+>>>>>>> 7f3827170d79bfe81bc096700b5471b426f9cc1e
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -28,9 +47,17 @@
 
   "content_scripts": [
     {
+<<<<<<< HEAD
       "matches": ["http://localhost:*/*", "https://*.agentshield.io/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
+=======
+      "matches": ["<all_urls>"],
+      "js": ["content.js", "scanner.js"],
+      "css": ["scanner.css"],
+      "run_at": "document_idle",
+      "all_frames": true
+>>>>>>> 7f3827170d79bfe81bc096700b5471b426f9cc1e
     }
   ],
 

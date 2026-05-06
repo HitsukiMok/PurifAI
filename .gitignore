@@ -1,15 +1,24 @@
+<<<<<<< HEAD
 # ─────────────────────────────────────────────────────────────────────────────
 #  AgentShield Monorepo — Root .gitignore
 #  Covers all three sub-projects: extension/, web-dashboard/, backend/
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Logs ──────────────────────────────────────────────────────────────────────
+=======
+.env
+.env.*
+!.env.example
+
+node_modules/
+>>>>>>> 7f3827170d79bfe81bc096700b5471b426f9cc1e
 logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+<<<<<<< HEAD
 
 # ── Dependencies ──────────────────────────────────────────────────────────────
 node_modules/
@@ -56,11 +65,53 @@ backend/.env
 .idea/
 .DS_Store
 Thumbs.db
+=======
+lerna-debug.log*
+
+dist/
+build/
+dist-ssr/
+.output/
+.vinxi/
+.tanstack/
+.nitro/
+*.local
+
+.vite/
+.eslintcache
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+venv/
+env/
+.venv/
+env.bak/
+venv.bak/
+
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+.wrangler/
+.dev.vars
+
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+>>>>>>> 7f3827170d79bfe81bc096700b5471b426f9cc1e
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+<<<<<<< HEAD
 
 # ── Temp / Migration ──────────────────────────────────────────────────────────
 migrate.ps1
+=======
+>>>>>>> 7f3827170d79bfe81bc096700b5471b426f9cc1e
