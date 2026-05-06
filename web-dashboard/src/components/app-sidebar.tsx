@@ -12,6 +12,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useTheme } from "@/hooks/use-theme";
 
 const items = [
   { title: "Command Center", url: "/", icon: LayoutDashboard },
@@ -24,6 +25,7 @@ const items = [
 
 export function AppSidebar() {
   const { state } = useSidebar();
+  const { theme } = useTheme(); // Access current theme status
   const collapsed = state === "collapsed";
   const currentPath = useRouterState({ select: (r) => r.location.pathname });
 
@@ -31,12 +33,20 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-3">
-          <div className="relative flex h-8 w-8 items-center justify-center rounded-md bg-primary/15 text-primary glow-ai">
-            <Shield className="h-4 w-4" />
+          {/* Logo container */}
+          <div className="relative flex h-8 w-8 items-center justify-center rounded-md">
+            {/* Swaps icon based on theme. Files must be in /public folder. */}
+            <img 
+              src={theme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} 
+              alt="Logo" 
+              className="h-10 w-10 object-contain" 
+            />
           </div>
+          
           {!collapsed && (
             <div className="flex flex-col leading-tight">
-              <span className="text-sm font-semibold tracking-tight">AgentShield</span>
+              {/* Changed name to PurifAI */}
+              <span className="text-sm font-semibold tracking-tight font-sans">PurifAI</span>
               <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                 Platform
               </span>
@@ -44,6 +54,7 @@ export function AppSidebar() {
           )}
         </div>
       </SidebarHeader>
+      
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Operations</SidebarGroupLabel>

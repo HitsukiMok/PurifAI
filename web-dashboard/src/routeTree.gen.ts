@@ -8,14 +8,14 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './pages/__root'
-import { Route as ThreatsRouteImport } from './pages/threats'
-import { Route as SettingsRouteImport } from './pages/settings'
-import { Route as PoliciesRouteImport } from './pages/policies'
-import { Route as LogsRouteImport } from './pages/logs'
-import { Route as LoginRouteImport } from './pages/login'
-import { Route as AgentsRouteImport } from './pages/agents'
-import { Route as IndexRouteImport } from './pages/index'
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as ThreatsRouteImport } from './routes/threats'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as PoliciesRouteImport } from './routes/policies'
+import { Route as LogsRouteImport } from './routes/logs'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AgentsRouteImport } from './routes/agents'
+import { Route as IndexRouteImport } from './routes/index'
 
 const ThreatsRoute = ThreatsRouteImport.update({
   id: '/threats',
@@ -196,4 +196,3 @@ declare module '@tanstack/react-start' {
     router: Awaited<ReturnType<typeof getRouter>>
   }
 }
-
