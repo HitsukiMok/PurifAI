@@ -43,13 +43,16 @@ function Dashboard() {
   const { extensionConnected } = useExtensionBridge(rows, { scanned, blocked, agents });
 
   // Background ticker — adds clean rows so the feed feels alive.
+  // DISABLED for testing so you only see real traffic.
   useEffect(() => {
+    /*
     tickRef.current = window.setInterval(() => {
       const r = makeCleanRow();
       setRows((prev) => [r, ...prev].slice(0, 40));
       setNewestId(r.id);
       setScanned((s) => s + 1 + Math.floor(Math.random() * 3));
     }, 3500);
+    */
     return () => {
       if (tickRef.current) window.clearInterval(tickRef.current);
     };

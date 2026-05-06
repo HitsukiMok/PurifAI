@@ -35,8 +35,8 @@ function showDashboardScreen() {
 }
 
 // ── On load: check if already logged in ───────────────────────────────────
-chrome.storage.local.get(["agentshieldState"], (res) => {
-  const state = res.agentshieldState;
+chrome.storage.local.get(["purifaiState"], (res) => {
+  const state = res.purifaiState;
   if (state?.loggedIn && state?.user) {
     showDashboardScreen();
     handleStateUpdate(state);
