@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "AgentShield — AI Security Monitor",
-  "short_name": "AgentShield",
-  "description": "Real-time monitoring of indirect prompt injection attacks. Mini-dashboard for your AgentShield Platform.",
+  "name": "PurifAI Shield",
+  "short_name": "PurifAI",
+  "description": "Real-time AI protection against prompt injections. Powered by DeBERTa v3.",
   "version": "1.0.0",
 
   "permissions": ["storage", "activeTab", "scripting", "tabs"],
   "host_permissions": [
     "http://localhost:*/*",
-    "https://*.agentshield.io/*"
+    "https://*.agentshield.io/*",
+    "<all_urls>"
   ],
 
   "background": {
@@ -18,7 +19,7 @@
 
   "action": {
     "default_popup": "popup.html",
-    "default_title": "AgentShield Monitor",
+    "default_title": "PurifAI Shield",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -28,8 +29,9 @@
 
   "content_scripts": [
     {
-      "matches": ["http://localhost:*/*", "https://*.agentshield.io/*"],
-      "js": ["content.js"],
+      "matches": ["<all_urls>"],
+      "js": ["content.js", "scanner.js"],
+      "css": ["scanner.css"],
       "run_at": "document_idle"
     }
   ],

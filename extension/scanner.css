@@ -1,0 +1,120 @@
+/* ── PurifAI Scanner Styles ─────────────────────────────────────────────────
+   Injected into every page alongside scanner.js.
+   Provides visual feedback for safe/dangerous inputs.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── Danger glow on input fields ──────────────────────────────────────────── */
+.purifai-danger {
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.6),
+              0 0 20px rgba(248, 113, 113, 0.3) !important;
+  border-color: #f87171 !important;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+/* ── Safe flash on input fields ───────────────────────────────────────────── */
+.purifai-safe {
+  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.5),
+              0 0 12px rgba(74, 222, 128, 0.2) !important;
+  border-color: #4ade80 !important;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+/* ── Warning Banner ───────────────────────────────────────────────────────── */
+.purifai-banner {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  margin: 6px 0;
+  border-radius: 10px;
+  overflow: hidden;
+  animation: purifai-slide-in 0.35s ease-out;
+  z-index: 999999;
+  position: relative;
+}
+
+.purifai-banner-danger {
+  background: linear-gradient(135deg, #1c1012 0%, #2a1318 100%);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  box-shadow: 0 4px 24px rgba(248, 113, 113, 0.15),
+              0 0 0 1px rgba(248, 113, 113, 0.1);
+}
+
+.purifai-banner-feedback {
+  background: linear-gradient(135deg, #0f1c14 0%, #132a1a 100%);
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  box-shadow: 0 4px 24px rgba(74, 222, 128, 0.15);
+}
+
+.purifai-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+}
+
+.purifai-banner-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.purifai-banner-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.purifai-banner-text strong {
+  color: #f87171;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.purifai-banner-feedback .purifai-banner-text strong {
+  color: #4ade80;
+}
+
+.purifai-confidence {
+  color: #9ca3af;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+/* ── Report Mistake Button ────────────────────────────────────────────────── */
+.purifai-report-btn {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border-radius: 6px;
+  background: rgba(248, 113, 113, 0.15);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  color: #fca5a5;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.purifai-report-btn:hover {
+  background: rgba(248, 113, 113, 0.25);
+  box-shadow: 0 0 12px rgba(248, 113, 113, 0.2);
+  color: #ffffff;
+}
+
+.purifai-report-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Animations ───────────────────────────────────────────────────────────── */
+@keyframes purifai-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

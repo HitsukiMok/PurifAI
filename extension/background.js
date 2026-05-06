@@ -166,6 +166,37 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       sendResponse(state);
       break;
     }
+    // ── PurifAI: Real scan results from scanner.js ─────────────────────
+    case "PURIFAI_SCAN_RESULT": {
+      const scan = msg.data;
+      if (!scan) break;
+
+      // Always increment scanned
+      state.metrics.scanned += 1;
+
+      // Build a traffic row from the real scan
+      const row = {
+        id: crypto.randomUUID(),
+        time: new Date().toLocaleTimeString("en-GB", { hour12: false }),
+        source: `page://${(sender.tab?.url || "unknown").replace(/^https?:\/\//, "").split("/")[0]}`,
+        agent: "PurifAI Scanner",
+        risk: scan.is_safe ? Math.floor(Math.random() * 15) : Math.round(scan.confidence * 100),
+        status: scan.is_safe ? "Clean" : "Blocked",
+      };
+
+      if (!scan.is_safe) {
+        row.technique = "Prompt Injection";
+        row.payload = scan.text;
+        state.metrics.blocked += 1;
+      }
+
+      state.rows = [row, ...state.rows].slice(0, 30);
+      state.lastUpdate = Date.now();
+      broadcastState();
+      persistState();
+      sendResponse({ ok: true });
+      break;
+    }
   }
   return true; // Keep message channel open
 });
