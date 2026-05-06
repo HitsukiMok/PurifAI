@@ -62,20 +62,65 @@ async def scan_text(request: ScanRequest):
         
         logger.info(f"Scan complete. Result: {prediction['label']} ({prediction['score']:.4f})")
 
-        return {
+        scan_result = {
             "text": request.text,
             "is_safe": is_safe,
             "label": prediction['label'],
             "confidence": prediction['score']
         }
+
+        # Log to in-memory scan history for dashboard
+        import time
+        scan_entry = {
+            "id": str(uuid.uuid4()),
+            "timestamp": time.time(),
+            "time": datetime.now().strftime("%H:%M:%S"),
+            "text": request.text[:200],
+            "label": prediction['label'],
+            "confidence": prediction['score'],
+            "is_safe": is_safe,
+            "source": "extension-scan",
+        }
+        scan_log.appendleft(scan_entry)
+        scan_metrics["scanned"] += 1
+        if not is_safe:
+            scan_metrics["blocked"] += 1
+        logger.info(f"Scan logged. Total scanned: {scan_metrics['scanned']}, blocked: {scan_metrics['blocked']}")
+
+        return scan_result
     except Exception as e:
         logger.error(f"Inference failed: {e}")
         return {"error": "Inference failed", "exception": str(e)}
 
 
+# ──────────────────────────────────────────────────────────────
+#  In-memory scan log for dashboard
+# ──────────────────────────────────────────────────────────────
+from collections import deque
+import uuid
+
+scan_log = deque(maxlen=100)  # keep last 100 scans
+scan_metrics = {"scanned": 0, "blocked": 0}
+
 @app.get("/")
 def read_root():
     return {"status": "PurifAI Backend is running"}
+
+@app.get("/api/recent-scans")
+async def recent_scans(since: float = 0):
+    """Return scans newer than `since` (unix timestamp in seconds).
+    The dashboard polls this every few seconds.
+    Uses >= comparison to ensure boundary scans are not missed;
+    the frontend deduplicates by scan ID."""
+    results = [s for s in scan_log if s["timestamp"] >= since]
+    return {
+        "scans": list(results),
+        "metrics": scan_metrics,
+    }
+
+@app.get("/api/metrics")
+async def get_metrics():
+    return scan_metrics
 
 
 # ──────────────────────────────────────────────────────────────
