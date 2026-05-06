@@ -1,6 +1,6 @@
+import { useTheme } from "@/hooks/use-theme";
 import {
   Puzzle,
-  ShieldCheck,
   Zap,
   Activity,
   ScanSearch,
@@ -62,16 +62,21 @@ export function ExtensionSection({ extensionConnected }: ExtensionSectionProps) 
 // Install Card
 // ═════════════════════════════════════════════════════════════════════════
 function InstallCard({ extensionConnected }: { extensionConnected: boolean }) {
+  const { theme } = useTheme();
   return (
     <div className="flex flex-col rounded-xl border bg-card lg:flex-row">
       {/* Card header (left on desktop) */}
       <div className="flex items-center gap-4 border-b px-5 py-5 lg:border-b-0 lg:border-r lg:flex-col lg:items-start lg:justify-between lg:w-64 lg:shrink-0">
         <div className="flex items-center gap-3">
           <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-ai/20 via-card to-ai/5 ring-1 ring-ai/40 glow-ai">
-            <ShieldCheck className="h-7 w-7 text-ai" />
+            <img 
+              src={theme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} 
+              alt="PurifAI Logo" 
+              className={`h-9 w-9 object-contain ${theme === 'dark' ? 'drop-shadow-[0_0_12px_var(--color-ai)]' : ''}`} 
+  />
           </div>
           <div>
-            <p className="font-semibold tracking-tight">AgentShield Monitor</p>
+            <p className="font-semibold tracking-tight">PurifAI Monitor</p>
             <p className="text-xs text-muted-foreground">for Chrome</p>
             <div className="mt-1 flex items-center gap-1">
               {[1, 2, 3, 4, 5].map((i) => (
@@ -103,7 +108,7 @@ function InstallCard({ extensionConnected }: { extensionConnected: boolean }) {
           {/* AI-generated summary — wrapped with FeedbackActionRow */}
           <div className="rounded-lg border border-border/30 bg-muted/20 px-3.5 py-3">
             <p className="text-xs text-muted-foreground leading-relaxed max-w-xl">
-              Get your AgentShield mini-dashboard right in your browser toolbar. Monitor AI agent traffic,
+              Get your PurifAI mini-dashboard right in your browser toolbar. Monitor AI agent traffic,
               receive instant injection alerts, and inspect payloads — all without leaving your current tab.
             </p>
             <FeedbackActionRow
@@ -112,7 +117,7 @@ function InstallCard({ extensionConnected }: { extensionConnected: boolean }) {
                 surface: "extension_section",
                 input: "Describe the AgentShield browser extension capabilities",
                 output:
-                  "Get your AgentShield mini-dashboard right in your browser toolbar. Monitor AI agent traffic, receive instant injection alerts, and inspect payloads — all without leaving your current tab.",
+                  "Get your PurifAI mini-dashboard right in your browser toolbar. Monitor AI agent traffic, receive instant injection alerts, and inspect payloads — all without leaving your current tab.",
               }}
             />
           </div>

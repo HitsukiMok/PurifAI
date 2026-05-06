@@ -39,7 +39,7 @@ export function AppSidebar() {
             <img 
               src={theme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} 
               alt="Logo" 
-              className="h-10 w-10 object-contain" 
+              className={`h-9 w-9 object-contain ${theme === 'dark' ? 'drop-shadow-[0_0_12px_var(--color-ai)]' : ''}`}
             />
           </div>
           

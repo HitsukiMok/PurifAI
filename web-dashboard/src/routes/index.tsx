@@ -75,7 +75,7 @@ function Dashboard() {
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      <div className="mx-auto max-w-[1500px] space-y-4 p-3 sm:space-y-5 sm:p-4 md:p-6">
+      <div className="mx-au to max-w-[1500px] space-y-4 p-3 sm:space-y-5 sm:p-4 md:p-6">
         {/* Top row: metrics + CTA */}
         <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-[1fr_1fr_1fr_auto]">
           <MetricCard

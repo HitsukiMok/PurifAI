@@ -5,12 +5,13 @@ import {
   ArrowRight, Check, Globe2,
 } from "lucide-react";
 import { getAuth, setAuth, makeAvatarInitials, type AuthUser } from "@/lib/auth";
+import { useTheme } from "@/hooks/use-theme";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
-      { title: "Sign In — AgentShield Platform" },
-      { name: "description", content: "Sign in or connect your Chrome extension to AgentShield." },
+      { title: "Sign In — PurifAI Platform" },
+      { name: "description", content: "Sign in or connect your Chrome extension to PurifAI." },
     ],
   }),
   component: LoginPage,
@@ -24,7 +25,7 @@ function LoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
+  const { theme } = useTheme();
   // Sign-in fields
   const [siEmail, setSiEmail] = useState("");
   const [siPw, setSiPw] = useState("");
@@ -83,6 +84,7 @@ function LoginPage() {
   const switchTab = (t: Tab) => { setTab(t); setError(""); setShowPw(false); };
 
   return (
+    
     <div className="flex min-h-screen w-full bg-background scanline-bg">
       {/* ── Left hero panel ─────────────────────────────────────────────── */}
       <div className="relative hidden w-[45%] flex-col items-start justify-between overflow-hidden bg-card/60 p-10 lg:flex border-r border-border/40">
@@ -95,10 +97,14 @@ function LoginPage() {
         {/* Logo */}
         <div className="relative flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-ai/40 bg-ai/10 shadow-[0_0_20px_rgba(34,211,238,0.2)]">
-            <Shield className="h-5 w-5 text-ai" />
+              <img 
+                src={theme === 'dark' ? '/logo-dark.png' : '/logo-light.png'} 
+                alt="PurifAI Logo" 
+                className={`h-6 w-6 object-contain ${theme === 'dark' ? 'drop-shadow-[0_0_12px_var(--color-ai)]' : ''}`} 
+              />
           </div>
           <div>
-            <div className="text-sm font-bold tracking-tight text-foreground">AgentShield</div>
+            <div className="text-sm font-bold tracking-tight text-foreground">PurifAI</div>
             <div className="text-[9px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Security Platform</div>
           </div>
         </div>
@@ -112,7 +118,7 @@ function LoginPage() {
               in real time.
             </h1>
             <p className="mt-4 max-w-xs text-sm text-muted-foreground leading-relaxed">
-              AgentShield detects and blocks indirect prompt injection attacks before they compromise your enterprise AI workflows.
+              PurifAI detects and blocks indirect prompt injection attacks before they compromise your enterprise AI workflows.
             </p>
           </div>
 
@@ -156,7 +162,7 @@ function LoginPage() {
           <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-ai/40 bg-ai/10">
             <Shield className="h-4 w-4 text-ai" />
           </div>
-          <span className="text-base font-bold tracking-tight text-foreground">AgentShield</span>
+          <span className="text-base font-bold tracking-tight text-foreground">PurifAI</span>
         </div>
 
         <div className="w-full max-w-[380px] space-y-5">
@@ -181,7 +187,7 @@ function LoginPage() {
                   <span className="text-sm font-semibold text-foreground">Connect Extension</span>
                   <span className="rounded-full bg-ai/15 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-ai border border-ai/25">Recommended</span>
                 </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">Link your AgentShield Chrome extension to sync live data</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Link your PurifAI Chrome extension to sync live data</p>
               </div>
               <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-ai" />
             </div>
