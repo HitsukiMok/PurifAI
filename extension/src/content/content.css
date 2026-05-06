@@ -1,0 +1,7 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   AgentShield — Content Script Styles
+   Injected alongside content.js into monitored pages.
+   Keep specificity high to avoid conflicts with host-page styles.
+───────────────────────────────────────────────────────────────────────────── */
+
+/* Add page-level overlay, badge, or highlight styles here */

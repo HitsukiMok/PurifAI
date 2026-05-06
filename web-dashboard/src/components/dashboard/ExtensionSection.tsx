@@ -9,6 +9,7 @@ import {
   Download,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FeedbackActionRow } from "@/components/ui/FeedbackWidget";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface ExtensionSectionProps {
@@ -99,10 +100,22 @@ function InstallCard({ extensionConnected }: { extensionConnected: boolean }) {
       <div className="flex flex-1 flex-col gap-5 p-5 sm:flex-row sm:items-start sm:gap-8">
         {/* Description + features */}
         <div className="flex flex-1 flex-col gap-4">
-          <p className="text-xs text-muted-foreground leading-relaxed max-w-xl">
-            Get your AgentShield mini-dashboard right in your browser toolbar. Monitor AI agent traffic,
-            receive instant injection alerts, and inspect payloads — all without leaving your current tab.
-          </p>
+          {/* AI-generated summary — wrapped with FeedbackActionRow */}
+          <div className="rounded-lg border border-border/30 bg-muted/20 px-3.5 py-3">
+            <p className="text-xs text-muted-foreground leading-relaxed max-w-xl">
+              Get your AgentShield mini-dashboard right in your browser toolbar. Monitor AI agent traffic,
+              receive instant injection alerts, and inspect payloads — all without leaving your current tab.
+            </p>
+            <FeedbackActionRow
+              ctx={{
+                responseId: "extension-section-desc",
+                surface: "extension_section",
+                input: "Describe the AgentShield browser extension capabilities",
+                output:
+                  "Get your AgentShield mini-dashboard right in your browser toolbar. Monitor AI agent traffic, receive instant injection alerts, and inspect payloads — all without leaving your current tab.",
+              }}
+            />
+          </div>
           <ul className="grid gap-2 sm:grid-cols-2">
             {FEATURES.map(({ icon: Icon, label }) => (
               <li key={label} className="flex items-start gap-2.5">
