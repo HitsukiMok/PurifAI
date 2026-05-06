@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "AgentShield — AI Security Monitor",
+  "short_name": "AgentShield",
+  "description": "Real-time monitoring of indirect prompt injection attacks. Mini-dashboard for your AgentShield Platform.",
+  "version": "1.0.0",
+
+  "permissions": ["storage", "activeTab", "scripting", "tabs"],
+  "host_permissions": [
+    "http://localhost:*/*",
+    "https://*.agentshield.io/*"
+  ],
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "AgentShield Monitor",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["http://localhost:*/*", "https://*.agentshield.io/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

@@ -13,6 +13,7 @@ import { Route as ThreatsRouteImport } from './routes/threats'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as PoliciesRouteImport } from './routes/policies'
 import { Route as LogsRouteImport } from './routes/logs'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -36,6 +37,11 @@ const LogsRoute = LogsRouteImport.update({
   path: '/logs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AgentsRoute = AgentsRouteImport.update({
   id: '/agents',
   path: '/agents',
@@ -50,6 +56,7 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agents': typeof AgentsRoute
+  '/login': typeof LoginRoute
   '/logs': typeof LogsRoute
   '/policies': typeof PoliciesRoute
   '/settings': typeof SettingsRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agents': typeof AgentsRoute
+  '/login': typeof LoginRoute
   '/logs': typeof LogsRoute
   '/policies': typeof PoliciesRoute
   '/settings': typeof SettingsRoute
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/agents': typeof AgentsRoute
+  '/login': typeof LoginRoute
   '/logs': typeof LogsRoute
   '/policies': typeof PoliciesRoute
   '/settings': typeof SettingsRoute
@@ -74,13 +83,28 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/agents' | '/logs' | '/policies' | '/settings' | '/threats'
+  fullPaths:
+    | '/'
+    | '/agents'
+    | '/login'
+    | '/logs'
+    | '/policies'
+    | '/settings'
+    | '/threats'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/agents' | '/logs' | '/policies' | '/settings' | '/threats'
+  to:
+    | '/'
+    | '/agents'
+    | '/login'
+    | '/logs'
+    | '/policies'
+    | '/settings'
+    | '/threats'
   id:
     | '__root__'
     | '/'
     | '/agents'
+    | '/login'
     | '/logs'
     | '/policies'
     | '/settings'
@@ -90,6 +114,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgentsRoute: typeof AgentsRoute
+  LoginRoute: typeof LoginRoute
   LogsRoute: typeof LogsRoute
   PoliciesRoute: typeof PoliciesRoute
   SettingsRoute: typeof SettingsRoute
@@ -126,6 +151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LogsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/agents': {
       id: '/agents'
       path: '/agents'
@@ -146,6 +178,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgentsRoute: AgentsRoute,
+  LoginRoute: LoginRoute,
   LogsRoute: LogsRoute,
   PoliciesRoute: PoliciesRoute,
   SettingsRoute: SettingsRoute,
@@ -154,3 +187,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

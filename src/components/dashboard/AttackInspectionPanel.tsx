@@ -1,5 +1,24 @@
 import type { TrafficRow } from "@/lib/mock-traffic";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+function riskColor(risk: number) {
+  if (risk >= 80) return "text-danger";
+  if (risk >= 50) return "text-amber-400";
+  return "text-success";
+}
+
+function riskBarColor(risk: number) {
+  if (risk >= 80) return "bg-danger";
+  if (risk >= 50) return "bg-amber-400";
+  return "bg-success";
+}
+
+function riskLabel(risk: number) {
+  if (risk >= 80) return "Critical";
+  if (risk >= 50) return "Medium";
+  return "Low";
+}
 
 export function AttackInspectionPanel({ attack }: { attack: TrafficRow }) {
   const before = attack.raw ?? "";
@@ -12,26 +31,43 @@ export function AttackInspectionPanel({ attack }: { attack: TrafficRow }) {
 
   return (
     <div className="flex h-full flex-col rounded-xl border bg-card">
-      <div className="flex items-center justify-between border-b px-5 py-4">
+      <div className="flex items-center justify-between border-b px-4 py-3 sm:px-5 sm:py-4">
         <div className="flex items-center gap-2">
           <ShieldAlert className="h-4 w-4 text-danger" />
           <h2 className="text-sm font-semibold tracking-tight">Attack Inspection</h2>
         </div>
         {attack.technique && (
-          <span className="rounded-full bg-danger/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-danger ring-1 ring-danger/30">
+          <span className="rounded-full bg-danger/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-danger ring-1 ring-danger/30 truncate max-w-[120px] sm:max-w-none">
             {attack.technique}
           </span>
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 border-b px-5 py-4 text-xs">
+      <div className="grid grid-cols-2 gap-3 border-b px-4 py-4 text-xs sm:px-5">
         <Meta label="Time" value={attack.time} mono />
-        <Meta label="Risk Score" value={String(attack.risk)} mono tone="danger" />
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Risk Score</p>
+          {/* Risk percentage with bar */}
+          <div className="mt-1 flex items-center gap-2">
+            <span className={cn("font-mono text-sm font-bold", riskColor(attack.risk))}>
+              {attack.risk}%
+            </span>
+            <span className={cn("text-[10px] font-medium uppercase", riskColor(attack.risk))}>
+              {riskLabel(attack.risk)}
+            </span>
+          </div>
+          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
+            <div
+              className={cn("h-full rounded-full transition-all duration-700", riskBarColor(attack.risk))}
+              style={{ width: `${attack.risk}%` }}
+            />
+          </div>
+        </div>
         <Meta label="Source" value={attack.source} mono />
         <Meta label="Target Agent" value={attack.agent} tone="ai" />
       </div>
 
-      <div className="flex-1 space-y-4 overflow-auto p-5">
+      <div className="flex-1 space-y-4 overflow-auto p-4 sm:p-5">
         <div>
           <div className="mb-2 flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-danger" />
