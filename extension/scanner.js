@@ -1,7 +1,10 @@
 // ── PurifAI Scanner — Content Script ───────────────────────────────────────
 // Injected into ALL web pages (including iframes via all_frames:true).
 // Routes API calls through the background service worker to bypass CSP.
+<<<<<<< blocking-feature
 // Blocks dangerous content with a confirmation overlay.
+=======
+>>>>>>> main
 
 (function () {
   "use strict";
@@ -13,18 +16,29 @@
   let mutationDebounce = null;
   let lastScannedText = "";
   let activeBanner = null;
+<<<<<<< blocking-feature
   let activeOverlay = null;
   let acknowledgedTexts = new Set(); // Track texts user has chosen to proceed on
+=======
+>>>>>>> main
 
   console.log("[PurifAI] Scanner loaded on:", window.location.href);
 
   // ── Scan via background proxy ─────────────────────────────────────────────
   function scanText(text) {
+<<<<<<< blocking-feature
     return new Promise(function (resolve) {
       try {
         chrome.runtime.sendMessage(
           { type: "PURIFAI_SCAN_REQUEST", text: text },
           function (response) {
+=======
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage(
+          { type: "PURIFAI_SCAN_REQUEST", text: text },
+          (response) => {
+>>>>>>> main
             if (chrome.runtime.lastError) {
               console.warn("[PurifAI] sendMessage error:", chrome.runtime.lastError.message);
               resolve(null);
@@ -48,11 +62,19 @@
 
   // ── Send feedback via background proxy ────────────────────────────────────
   function sendFeedback(payload) {
+<<<<<<< blocking-feature
     return new Promise(function (resolve) {
       try {
         chrome.runtime.sendMessage(
           { type: "PURIFAI_FEEDBACK_REQUEST", payload: payload },
           function (response) {
+=======
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage(
+          { type: "PURIFAI_FEEDBACK_REQUEST", payload: payload },
+          (response) => {
+>>>>>>> main
             if (chrome.runtime.lastError) {
               resolve(false);
               return;
@@ -66,6 +88,7 @@
     });
   }
 
+<<<<<<< blocking-feature
   // ── Helpers ───────────────────────────────────────────────────────────────
   function escapeHtml(str) {
     return String(str)
@@ -255,6 +278,12 @@
   // ── UI: Show floating toast warning (for acknowledged / lower-risk) ───────
   function showWarningBanner(element, data) {
     console.log("[PurifAI] ⚠️ Showing warning banner. Confidence:", data.confidence);
+=======
+  // ── UI: Show floating toast warning ───────────────────────────────────────
+  function showWarning(element, data) {
+    console.log("[PurifAI] 🚨 INJECTION DETECTED! Confidence:", data.confidence);
+    element.classList.add("purifai-danger");
+>>>>>>> main
     removeActiveBanner();
 
     var banner = document.createElement("div");
@@ -302,10 +331,18 @@
       });
     });
 
+<<<<<<< blocking-feature
+=======
+    // Append to the top-level document body (works even from iframes via try/catch)
+>>>>>>> main
     try {
       var targetDoc = window.top.document;
       targetDoc.body.appendChild(banner);
     } catch (e) {
+<<<<<<< blocking-feature
+=======
+      // Cross-origin iframe — append to this frame's body instead
+>>>>>>> main
       document.body.appendChild(banner);
     }
     activeBanner = banner;
@@ -316,7 +353,10 @@
     console.log("[PurifAI] ✅ Text is safe.");
     element.classList.remove("purifai-danger");
     removeActiveBanner();
+<<<<<<< blocking-feature
     removeActiveOverlay();
+=======
+>>>>>>> main
     element.classList.add("purifai-safe");
     setTimeout(function () { element.classList.remove("purifai-safe"); }, 1500);
   }
@@ -326,12 +366,17 @@
       try { activeBanner.remove(); } catch (e) {}
       activeBanner = null;
     }
+<<<<<<< blocking-feature
+=======
+    // Also clean up any orphaned banners
+>>>>>>> main
     try {
       var old = (window.top || window).document.getElementById("purifai-active-banner");
       if (old) old.remove();
     } catch (e) {}
   }
 
+<<<<<<< blocking-feature
   function removeActiveOverlay() {
     if (activeOverlay) {
       try {
@@ -349,6 +394,8 @@
     } catch (e) {}
   }
 
+=======
+>>>>>>> main
   // ── Core: Handle an input event on any element ────────────────────────────
   function handleInput(element) {
     var text = "";
@@ -384,8 +431,12 @@
       }
 
       if (result.is_safe === false) {
+<<<<<<< blocking-feature
         // BLOCK with full overlay — not just a warning
         showBlockingOverlay(element, result);
+=======
+        showWarning(element, result);
+>>>>>>> main
       } else {
         showSafe(element);
       }
@@ -412,6 +463,10 @@
   }, true);
 
   // ── Watch contenteditable divs (Gmail, ChatGPT, Claude, etc.) ─────────────
+<<<<<<< blocking-feature
+=======
+  // Also watch for keyup events as a fallback for editors that swallow input events
+>>>>>>> main
   document.addEventListener("keyup", function (e) {
     var t = e.target;
     if (!t) return;
@@ -445,6 +500,7 @@
     }
   }, 1000);
 
+<<<<<<< blocking-feature
   // ── Listen for interceptor-level blocks (network layer) ───────────────────
   // When interceptor.js (MAIN world) detects and redacts a malicious payload
   // from a fetch/XHR response, it posts this event so we can show the
@@ -481,3 +537,6 @@
 
 })();
 
+=======
+})();
+>>>>>>> main

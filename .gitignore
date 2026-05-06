@@ -51,3 +51,8 @@ htmlcov/
 *.njsproj
 *.sln
 *.sw?
+<<<<<<< blocking-feature
+=======
+
+.agent/*
+>>>>>>> main
