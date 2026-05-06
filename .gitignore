@@ -1,28 +1,31 @@
-
 .env
 .env.*
 !.env.example
 
-
 node_modules/
+logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+lerna-debug.log*
 
 dist/
 build/
-extension/dist/
-web-dashboard/dist/
+dist-ssr/
+.output/
+.vinxi/
+.tanstack/
+.nitro/
+*.local
 
 .vite/
 .eslintcache
 
-
 __pycache__/
 *.py[cod]
 *$py.class
-
 
 venv/
 env/
@@ -36,5 +39,15 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
+.wrangler/
+.dev.vars
 
-.vscode/
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
