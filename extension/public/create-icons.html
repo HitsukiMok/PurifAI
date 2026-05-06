@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Generate AgentShield Extension Icons</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #11141f; color: #e8eaf4; display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 40px; }
+    h1   { font-size: 18px; color: #22d3ee; }
+    p    { color: #6b74a0; font-size: 13px; text-align: center; max-width: 480px; }
+    .icons { display: flex; gap: 24px; align-items: flex-end; }
+    .icon-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .icon-wrap span { font-size: 11px; color: #6b74a0; }
+    a.dl  { display: inline-block; margin-top: 6px; padding: 4px 14px; background: rgba(34,211,238,0.15); border: 1px solid rgba(34,211,238,0.4); color: #22d3ee; border-radius: 6px; font-size: 11px; text-decoration: none; cursor: pointer; }
+    a.dl:hover { background: rgba(34,211,238,0.25); }
+    .instructions { background: #181b2e; border: 1px solid rgba(100,116,175,0.25); border-radius: 10px; padding: 20px 24px; max-width: 520px; }
+    .instructions h2 { font-size: 14px; color: #22d3ee; margin-bottom: 10px; }
+    .instructions ol { padding-left: 18px; color: #a8aec8; font-size: 12px; line-height: 2; }
+    code { background: #1d2038; padding: 2px 6px; border-radius: 4px; font-size: 11px; color: #22d3ee; }
+  </style>
+</head>
+<body>
+  <h1>🛡 AgentShield — Icon Generator</h1>
+  <p>Click each download button below to save the PNG icons into <code>extension/icons/</code></p>
+
+  <div class="icons">
+    <div class="icon-wrap">
+      <canvas id="c16" width="16" height="16"></canvas>
+      <span>16 × 16</span>
+      <a class="dl" id="dl16">Download icon16.png</a>
+    </div>
+    <div class="icon-wrap">
+      <canvas id="c48" width="48" height="48"></canvas>
+      <span>48 × 48</span>
+      <a class="dl" id="dl48">Download icon48.png</a>
+    </div>
+    <div class="icon-wrap">
+      <canvas id="c128" width="128" height="128"></canvas>
+      <span>128 × 128</span>
+      <a class="dl" id="dl128">Download icon128.png</a>
+    </div>
+  </div>
+
+  <div class="instructions">
+    <h2>📂 Installation Steps</h2>
+    <ol>
+      <li>Download all three icons above</li>
+      <li>Move them to <code>extension/icons/</code> as <code>icon16.png</code>, <code>icon48.png</code>, <code>icon128.png</code></li>
+      <li>Open Chrome → <code>chrome://extensions</code></li>
+      <li>Enable <strong>Developer mode</strong> (top-right toggle)</li>
+      <li>Click <strong>Load unpacked</strong> → select the <code>extension/</code> folder</li>
+      <li>The AgentShield icon appears in your toolbar — click it to open the mini-dashboard!</li>
+    </ol>
+  </div>
+
+  <script>
+    function drawShield(ctx, size) {
+      const s = size;
+      const scale = s / 24;
+      ctx.save();
+      ctx.scale(scale, scale);
+
+      // Background circle
+      const grad = ctx.createRadialGradient(12, 10, 0, 12, 12, 14);
+      grad.addColorStop(0, "#1d2038");
+      grad.addColorStop(1, "#11141f");
+      ctx.beginPath();
+      ctx.arc(12, 12, 12, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Cyan glow ring
+      ctx.beginPath();
+      ctx.arc(12, 12, 11.2, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(34,211,238,0.45)";
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+
+      // Shield path
+      ctx.beginPath();
+      ctx.moveTo(12, 3);
+      ctx.lineTo(20, 6.5);
+      ctx.lineTo(20, 12);
+      ctx.quadraticCurveTo(20, 17, 12, 21);
+      ctx.quadraticCurveTo(4, 17, 4, 12);
+      ctx.lineTo(4, 6.5);
+      ctx.closePath();
+
+      // Shield gradient fill
+      const shieldGrad = ctx.createLinearGradient(4, 3, 20, 21);
+      shieldGrad.addColorStop(0, "rgba(34,211,238,0.35)");
+      shieldGrad.addColorStop(1, "rgba(34,211,238,0.1)");
+      ctx.fillStyle = shieldGrad;
+      ctx.fill();
+
+      // Shield stroke
+      ctx.strokeStyle = "#22d3ee";
+      ctx.lineWidth = 1.2;
+      ctx.lineJoin = "round";
+      ctx.stroke();
+
+      // Inner checkmark / lock accent
+      ctx.beginPath();
+      ctx.moveTo(9, 12);
+      ctx.lineTo(11.5, 14.5);
+      ctx.lineTo(15, 10);
+      ctx.strokeStyle = "#22d3ee";
+      ctx.lineWidth = 1.4;
+      ctx.lineCap = "round";
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    const sizes = [16, 48, 128];
+    sizes.forEach((sz) => {
+      const canvas = document.getElementById(`c${sz}`);
+      const ctx    = canvas.getContext("2d");
+      drawShield(ctx, sz);
+
+      const dl = document.getElementById(`dl${sz}`);
+      dl.href     = canvas.toDataURL("image/png");
+      dl.download = `icon${sz}.png`;
+    });
+  </script>
+</body>
+</html>
