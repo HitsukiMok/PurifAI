@@ -452,6 +452,12 @@
     try {
       var old = (window.top || window).document.getElementById("purifai-blocking-overlay");
       if (old) old.remove();
+      
+      // Clear all stamps to allow fresh scans on the new view
+      var stamps = document.querySelectorAll('[data-purifai-scanned]');
+      for (var i = 0; i < stamps.length; i++) {
+        stamps[i].removeAttribute('data-purifai-scanned');
+      }
     } catch (e) {}
   }
 
@@ -576,6 +582,12 @@
 
     scanText(trimmed).then(function (result) {
       isCurrentlyScanning = false;
+      
+      // Step 5: Resolution - Update the stamp to complete
+      emailContainers.forEach(function (node) {
+        node.setAttribute('data-purifai-scanned', 'complete');
+      });
+
       if (mainElement) {
           handleScanResponse(result, mainElement, trimmed);
       }
@@ -583,32 +595,44 @@
   }
 
   var observer = new MutationObserver(function (mutations) {
-    // 🚨 DEBOUNCE CIRCUIT BREAKER: Immediately clear previous timers
-    clearTimeout(scanTimeout);
-
-    // If a request is already in-flight, ignore all new DOM noise
-    if (isCurrentlyScanning) return;
-
+    // 🚨 TRANSITION CHECK: Reset state when switching emails
     var newEmailId = window.location.hash;
     if (newEmailId !== currentEmailId) {
       currentEmailId = newEmailId;
       hasTriggeredDanger = false;
       hasScannedCurrentEmailId = false;
+      isCurrentlyScanning = false;
       removeActiveOverlay();
     }
 
-    if (hasTriggeredDanger) return;
+    // 🚨 DOM STAMPING: Find all target containers and lock them immediately
+    var targets = document.querySelectorAll('.a3s.aiL, h2.hP');
+    var hasNewContent = false;
 
-    // Set a timeout to wait for Gmail's DOM to "quiet down"
+    for (var i = 0; i < targets.length; i++) {
+      var node = targets[i];
+      // Step 1: Check the stamp
+      if (node.hasAttribute('data-purifai-scanned')) continue;
+
+      // Step 2: Apply 'pending' stamp instantly to lock this node
+      node.setAttribute('data-purifai-scanned', 'pending');
+      hasNewContent = true;
+    }
+
+    // If no new/unstamped nodes were found, bail out instantly
+    if (!hasNewContent) return;
+
+    // 🚨 TRUE DEBOUNCE: Wait for Gmail's DOM noise to quiet down
+    clearTimeout(scanTimeout);
     scanTimeout = setTimeout(function () {
-      var emailContainers = document.querySelectorAll('.a3s.aiL, h2.hP');
-      if (emailContainers.length === 0) return;
-
-      // Only scan if we haven't already locked the page or found a threat
       if (isCurrentlyScanning || hasTriggeredDanger) return;
+      
+      // Re-verify targets before firing
+      var currentTargets = document.querySelectorAll('.a3s.aiL[data-purifai-scanned="pending"], h2.hP[data-purifai-scanned="pending"]');
+      if (currentTargets.length === 0) return;
 
       isCurrentlyScanning = true;
-      doScan(emailContainers);
+      doScan(currentTargets);
     }, 250);
   });
 
