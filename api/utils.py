@@ -52,9 +52,8 @@ def query_huggingface(text: str):
         return {"error": "Model not loaded", "warming_up": False}
 
     try:
-        # Run local inference
-        # The pipeline returns: [{"label": "SAFE", "score": 0.99...}]
-        results = classifier(text)
+        # Run local inference with strict truncation to 512 tokens
+        results = classifier(text, truncation=True, max_length=512)
         
         if isinstance(results, list) and len(results) > 0:
             # We transform this into the dictionary format expected by scan.py

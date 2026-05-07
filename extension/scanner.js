@@ -470,9 +470,13 @@
 
       // Step 2: Extract text
       var clone = targetNode.cloneNode(true);
-      var junks = clone.querySelectorAll('style, script');
+      // Aggressively remove junk and thread history (.gmail_quote)
+      var junks = clone.querySelectorAll('style, script, .gmail_quote');
       for (var i = 0; i < junks.length; i++) junks[i].remove();
-      var combinedText = (clone.innerText || clone.textContent || "").trim();
+      
+      var extracted = (clone.innerText || clone.textContent || "").trim();
+      // Payload Diet: Only scan the first 2500 characters
+      var combinedText = extracted.slice(0, 2500);
 
       if (combinedText.length < MIN_TEXT_LENGTH) {
         targetNode.setAttribute('data-purifai-scanned', 'complete');
