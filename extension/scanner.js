@@ -714,13 +714,10 @@
     });
   }
 
-  function injectScanButton(nativeBtn) {
-    // Find the parent attachment card (action bar container)
-    var attachmentCard = nativeBtn.closest('[class]') || nativeBtn.parentElement;
-    if (!attachmentCard) return;
-    if (attachmentCard.querySelector('.purifai-scan-attachment-btn')) return;
+  function injectScanButton(attachmentCard) {
+    if (attachmentCard.classList.contains('purifai-injected')) return;
 
-    // Extract filename from the card — look for download_url attr, aria-label, or title
+    // Extract filename from the card
     var filename = "";
     var fileUrl = "";
 
@@ -744,12 +741,26 @@
       }
     }
 
-    // Strategy 3: Aria label or title on the card itself
+    // Strategy 3: Aria label or title on the card itself or its children
     if (!filename) {
-      var titleEl = attachmentCard.querySelector('[title]') || attachmentCard.querySelector('[aria-label]');
-      if (titleEl) {
-        filename = titleEl.getAttribute('title') || titleEl.getAttribute('aria-label') || "";
+      filename = attachmentCard.getAttribute('title') || attachmentCard.getAttribute('aria-label') || "";
+      if (!filename) {
+        var titleEl = attachmentCard.querySelector('[title]') || attachmentCard.querySelector('[aria-label]');
+        if (titleEl) {
+          filename = titleEl.getAttribute('title') || titleEl.getAttribute('aria-label') || "";
+        }
       }
+    }
+
+    // Strategy 4: Find span[dir="ltr"] text
+    if (!filename) {
+       var spans = attachmentCard.querySelectorAll('span[dir="ltr"]');
+       spans.forEach(function(s) {
+           var t = s.textContent.trim();
+           if (t.toLowerCase().endsWith('.pdf') || t.toLowerCase().endsWith('.txt')) {
+               filename = t;
+           }
+       });
     }
 
     if (!filename) return;
@@ -757,6 +768,9 @@
     // MIME Type Check: Only inject for PDF and TXT files
     var ext = filename.split('.').pop().toLowerCase();
     if (!['pdf', 'txt'].includes(ext)) return;
+
+    // Mark as injected
+    attachmentCard.classList.add('purifai-injected');
 
     var btn = document.createElement('button');
     btn.className = 'purifai-scan-attachment-btn';
@@ -774,9 +788,20 @@
       attachmentCard.style.position = 'relative';
       var shield = document.createElement('div');
       shield.className = 'purifai-glass-shield purifai-attachment-shield';
-      shield.innerHTML = '<div class="purifai-glass-spinner"></div><div>Scanning file...</div>';
+      shield.innerHTML = '<div class="purifai-glass-spinner"></div><div>Scanning...</div>';
       shield.addEventListener('click', function(ev) { ev.stopPropagation(); ev.preventDefault(); }, true);
       attachmentCard.appendChild(shield);
+
+      // If we don't have a direct fileUrl from the DOM, the background script will try to intercept via chrome.downloads if the user clicks download natively.
+      // But for our manual scan button to work, we need a URL. If we couldn't find one, we might need to rely on the interceptor.
+      // In many Gmail cases, there isn't a direct link exposed until hover.
+      // If we don't have fileUrl, we'll try to find it dynamically or just trigger a click on the card to force Gmail to load the URL?
+      // For now, assume strategy 1 or 2 found it, or background intercept is the primary way.
+      if (!fileUrl) {
+         // Attempt to find it one last time before sending
+         var dl = attachmentCard.querySelector('a[href]');
+         if (dl) fileUrl = dl.href;
+      }
 
       scanFileViaBackground(fileUrl, filename, attachmentCard).then(function(response) {
         var s = attachmentCard.querySelector('.purifai-attachment-shield');
@@ -816,10 +841,32 @@
   }
 
   function scanForAttachments() {
-    // Robust selectors: target Gmail's native download buttons and download_url elements
-    var downloadBtns = document.querySelectorAll('div[data-tooltip="Download"], div[data-tooltip="Download attachment"], a[download_url], [download_url]');
-    downloadBtns.forEach(function(el) {
-      injectScanButton(el);
+    // Strategy A: Find elements with download_url
+    var downloadUrlEls = document.querySelectorAll('[download_url]:not(.purifai-injected)');
+    downloadUrlEls.forEach(function(el) {
+       injectScanButton(el);
+    });
+
+    // Strategy B: Find elements with title or aria-label ending in .pdf or .txt
+    var titleEls = document.querySelectorAll('[title$=".pdf" i], [title$=".txt" i], [aria-label$=".pdf" i], [aria-label$=".txt" i]');
+    titleEls.forEach(function(el) {
+       if (!el.classList.contains('purifai-injected')) {
+           // Try to find the outermost card container. It might be this element itself or a parent wrapper.
+           var card = el.closest('[role="listitem"]') || el;
+           injectScanButton(card);
+       }
+    });
+
+    // Strategy C: Find span[dir="ltr"] that contain the file name, then traverse up
+    var spans = document.querySelectorAll('span[dir="ltr"]');
+    spans.forEach(function(span) {
+        var text = span.textContent.trim().toLowerCase();
+        if (text.endsWith('.pdf') || text.endsWith('.txt')) {
+            var card = span.closest('[role="listitem"]') || span.closest('div[class*=" "]') || span.parentElement;
+            if (card && !card.classList.contains('purifai-injected')) {
+                injectScanButton(card);
+            }
+        }
     });
   }
 

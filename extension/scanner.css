@@ -600,9 +600,9 @@
 /* ── Attachment Scan Button ────────────────────────────────────────────── */
 .purifai-scan-attachment-btn {
   position: absolute !important;
-  top: 4px !important;
-  right: 4px !important;
-  z-index: 999 !important;
+  bottom: 8px !important;
+  right: 8px !important;
+  z-index: 100 !important;
   padding: 4px 10px !important;
   border: none !important;
   border-radius: 12px !important;
