@@ -5,6 +5,9 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipe
 import torch
 import csv
 import os
+import re
+import hashlib
+import functools
 from datetime import datetime
 
 import logging
@@ -48,6 +51,21 @@ def get_classifier():
             raise e
     return classifier
 
+MARKETING_REGEX = re.compile(
+    r"(unsubscribe|view in browser|manage preferences|opt-out|newsletter|privacy policy|click here to unsubscribe)", 
+    re.IGNORECASE
+)
+
+@functools.lru_cache(maxsize=500)
+def cached_inference(text_hash: str, cleaned_text: str):
+    """
+    We pass text_hash to ensure LRU cache key uniqueness based on the hash,
+    while using the cleaned_text for actual inference.
+    """
+    model_pipeline = get_classifier()
+    result = model_pipeline(cleaned_text)
+    return result[0]
+
 class ScanRequest(BaseModel):
     text: str
 
@@ -55,18 +73,35 @@ class ScanRequest(BaseModel):
 async def scan_text(request: ScanRequest):
     logger.info(f"Received scan request. Length: {len(request.text)} chars")
     try:
-        model_pipeline = get_classifier()
-        result = model_pipeline(request.text)
-        prediction = result[0]
-        is_safe = (prediction['label'] == 'SAFE')
+        # 1. HTML Stripping for cleaner inference
+        cleaned_text = re.sub(r'<[^>]+>', ' ', request.text).strip()
         
-        logger.info(f"Scan complete. Result: {prediction['label']} ({prediction['score']:.4f})")
+        # 2. Caching via SHA-256
+        text_hash = hashlib.sha256(cleaned_text.encode('utf-8')).hexdigest()
+        
+        # 3. Model Inference (cached)
+        prediction = cached_inference(text_hash, cleaned_text)
+        label = prediction['label']
+        confidence = prediction['score']
+        is_safe = (label == 'SAFE')
+        
+        # 4. False Positive Mitigations (Downgrade Logic)
+        if not is_safe:
+            word_count = len(cleaned_text.split())
+            has_marketing = MARKETING_REGEX.search(cleaned_text) is not None
+            
+            if word_count < 50 or has_marketing:
+                logger.info("Downgrading false positive using marketing heuristics.")
+                is_safe = True
+                label = 'SAFE (Marketing)'
+
+        logger.info(f"Scan complete. Result: {label} ({confidence:.4f})")
 
         scan_result = {
-            "text": request.text,
+            "text": request.text,  # Return original text to extension
             "is_safe": is_safe,
-            "label": prediction['label'],
-            "confidence": prediction['score']
+            "label": label,
+            "confidence": confidence
         }
 
         # Log to in-memory scan history for dashboard
@@ -76,8 +111,8 @@ async def scan_text(request: ScanRequest):
             "timestamp": time.time(),
             "time": datetime.now().strftime("%H:%M:%S"),
             "text": request.text[:200],
-            "label": prediction['label'],
-            "confidence": prediction['score'],
+            "label": label,
+            "confidence": confidence,
             "is_safe": is_safe,
             "source": "extension-scan",
         }

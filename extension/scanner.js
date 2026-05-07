@@ -6,7 +6,7 @@
 (function () {
   "use strict";
 
-  const DEBOUNCE_MS = 900;
+  const DEBOUNCE_MS = 500;
   const MIN_TEXT_LENGTH = 12;
 
   let debounceTimer = null;
@@ -15,6 +15,7 @@
   let activeBanner = null;
   let activeOverlay = null;
   let acknowledgedTexts = new Set(); // Track texts user has chosen to proceed on
+  let processedMessageIds = new Set(); // Track message IDs to prevent popup spam
 
   console.log("[PurifAI] Scanner loaded on:", window.location.href);
 
@@ -86,6 +87,14 @@
   function truncateText(text, maxLen) {
     if (text.length <= maxLen) return text;
     return text.substring(0, maxLen) + "…";
+  }
+
+  function getMessageId(element) {
+    var container = element.closest ? element.closest('[data-message-id]') : null;
+    if (container) return container.getAttribute('data-message-id');
+    // Fallback if no message ID exists (e.g., subject line)
+    var text = element.textContent || element.innerText || "";
+    return text.trim().substring(0, 40);
   }
 
   // ── UI: Show blocking overlay (full-screen confirmation popup) ────────────
@@ -373,6 +382,14 @@
       console.log("[PurifAI] Same text, skipping.");
       return;
     }
+    
+    var msgId = getMessageId(element);
+    if (processedMessageIds.has(msgId) && !element.isContentEditable) {
+        // Skip scanning if we've already processed this rendered email body
+        // (We still scan contentEditable inputs continuously as the user types)
+        return;
+    }
+
     lastScannedText = trimmed;
 
     console.log("[PurifAI] Scanning text:", trimmed.substring(0, 80) + "...");
@@ -381,6 +398,10 @@
       if (!result || result.error) {
         console.warn("[PurifAI] Scan failed or returned error:", result);
         return;
+      }
+      
+      if (!element.isContentEditable) {
+          processedMessageIds.add(msgId);
       }
 
       if (result.is_safe === false) {
@@ -435,7 +456,8 @@
     if (foundRelevantChange) {
       clearTimeout(mutationDebounce);
       mutationDebounce = setTimeout(function () {
-        var emailContainers = document.querySelectorAll('.a3s.aiL, div[data-message-id]');
+        // Strict targeting: Message bodies and Subject lines
+        var emailContainers = document.querySelectorAll('.a3s.aiL, h2.hP');
         emailContainers.forEach(function (container) {
           handleInput(container);
         });
