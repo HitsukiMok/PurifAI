@@ -1,5 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
-@import "tailwindcss" source(none);
+@import "tailwindcss";
 @import "tw-animate-css";
 @source "../src";
 
@@ -279,7 +279,7 @@
 
   /* ── Feedback reported persistent state ── */
   .feedback-reported {
-    color: theme(colors.amber.400);
+    color: var(--color-amber-400);
     opacity: 1 !important;
   }
 }
