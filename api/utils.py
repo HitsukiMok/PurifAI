@@ -56,22 +56,28 @@ def query_huggingface(text: str):
             }
 
         if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail=f"HF API Error: {response.text}")
+            # 🚨 HARD ERROR CATCH: Don't try to parse JSON if status is not 200
+            print(f"HF API non-200 response: {response.status_code}")
+            return {"error": "hf_overload", "warming_up": False}
 
-        results = response.json()
+        try:
+            results = response.json()
+        except Exception as e:
+            # 🚨 DEEP JSON CATCH: HF sometimes returns HTML on 429/500
+            print(f"HF JSON Parsing failed: {e}")
+            return {"error": "hf_overload", "warming_up": False}
+
         # HF returns a list of lists: [[{"label": "SAFE", "score": 0.99}, ...]]
         if isinstance(results, list) and len(results) > 0:
-            # Sort by score to get highest prediction if needed, or find specific label
-            # The model usually returns labels directly
             predictions = results[0]
-            # Convert to dict for easier access: {"SAFE": 0.99, "INJECTION": 0.01}
             return {p["label"]: p["score"] for p in predictions}
         
         return results
     except requests.exceptions.Timeout:
-        raise HTTPException(status_code=504, detail="Hugging Face API timed out.")
+        return {"error": "hf_timeout", "warming_up": False}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Inference error: {str(e)}")
+        print(f"Inference error in utils.py: {str(e)}")
+        return {"error": "hf_unknown", "warming_up": False}
 
 # ── Text Processing ─────────────────────────────────────────────────────────
 def clean_text(text: str) -> str:

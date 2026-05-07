@@ -27,15 +27,16 @@ async def scan_text(request: ScanRequest, http_request: Request):
     if isinstance(hf_result, dict) and hf_result.get("warming_up"):
         return hf_result
 
-    # 🚨 SAFETY NET: Handle HF Rate Limits or malformed responses
-    if not isinstance(hf_result, dict) or ("SAFE" not in hf_result and "INJECTION" not in hf_result):
-        print(f"Hugging Face Overload/Error: {hf_result}")
+    # 🚨 SAFETY NET: Handle HF Rate Limits, Timeouts, or Parsing Errors
+    if not isinstance(hf_result, dict) or "error" in hf_result or ("SAFE" not in hf_result and "INJECTION" not in hf_result):
+        error_type = hf_result.get("error", "unknown_overload") if isinstance(hf_result, dict) else "malformed_response"
+        print(f"Hugging Face Safety Net Triggered: {error_type}")
         return {
             "text": raw_text,
-            "is_safe": True, # Fail-open to protect user workflow
+            "is_safe": True, # Fail-open
             "label": "SAFE (API Bypass)",
             "confidence": 0.0,
-            "heuristic": "HF API Rate Limited"
+            "heuristic": f"HF API {error_type}"
         }
 
     # 3. Process Predictions (Calibrated Threshold)

@@ -528,11 +528,13 @@
   }, true);
 
   // ── Gmail-Specific Observer for Email Bodies ──────────────────────────────
-  let currentEmailId = null;
-  let hasTriggeredDanger = false;
+  var currentEmailId = null;
+  var hasTriggeredDanger = false;
+  var hasScannedCurrentEmailId = false;
+
+  // 🚨 CIRCUIT BREAKER: Global state to prevent infinite loops
+  let scanTimeout = null;
   let isCurrentlyScanning = false;
-  let apiDebounceTimer = null;
-  let hasScannedCurrentEmailId = false;
 
   function doScan(emailContainers) {
     var combinedText = "";
@@ -580,23 +582,14 @@
     });
   }
 
-    var observer = new MutationObserver(function (mutations) {
-      // 🚨 INFINITE LOOP PROTECTION: Completely ignore mutations on our own UI
-      for (let i = 0; i < mutations.length; i++) {
-        const m = mutations[i];
-        const target = m.target;
-        if (target.nodeType === Node.ELEMENT_NODE) {
-          if (target.classList.contains('purifai-shield') || target.closest('[class*="purifai-"]')) {
-            return; // Bail out entirely for this batch
-          }
-        } else if (target.parentNode && target.parentNode.nodeType === Node.ELEMENT_NODE) {
-          if (target.parentNode.closest('[class*="purifai-"]')) {
-            return; // Bail out
-          }
-        }
-      }
+  var observer = new MutationObserver(function (mutations) {
+    // 🚨 DEBOUNCE CIRCUIT BREAKER: Immediately clear previous timers
+    clearTimeout(scanTimeout);
 
-      var newEmailId = window.location.hash;
+    // If a request is already in-flight, ignore all new DOM noise
+    if (isCurrentlyScanning) return;
+
+    var newEmailId = window.location.hash;
     if (newEmailId !== currentEmailId) {
       currentEmailId = newEmailId;
       hasTriggeredDanger = false;
@@ -604,57 +597,19 @@
       removeActiveOverlay();
     }
 
-    if (hasTriggeredDanger) {
-      return;
-    }
-    
-    var foundRelevantChange = false;
-    for (var i = 0; i < mutations.length; i++) {
-      var m = mutations[i];
-      
-      var target = m.target;
-      if (target.nodeType === Node.ELEMENT_NODE) {
-          if (target.className && typeof target.className === 'string' && target.className.includes('purifai-')) continue;
-          if (target.closest && target.closest('[class*="purifai-"]')) continue;
-      } else if (target.parentNode && target.parentNode.nodeType === Node.ELEMENT_NODE) {
-          if (target.parentNode.closest && target.parentNode.closest('[class*="purifai-"]')) continue;
-      }
+    if (hasTriggeredDanger) return;
 
-      var hasPurifaiNode = false;
-      for (var j = 0; j < m.addedNodes.length; j++) {
-         var n = m.addedNodes[j];
-         if (n.nodeType === Node.ELEMENT_NODE && n.className && typeof n.className === 'string' && n.className.includes('purifai-')) {
-             hasPurifaiNode = true;
-             break;
-         }
-      }
-      if (hasPurifaiNode) continue;
-
-      if (m.addedNodes.length > 0 || m.type === 'characterData') {
-        foundRelevantChange = true;
-        break;
-      }
-    }
-
-    if (foundRelevantChange) {
+    // Set a timeout to wait for Gmail's DOM to "quiet down"
+    scanTimeout = setTimeout(function () {
       var emailContainers = document.querySelectorAll('.a3s.aiL, h2.hP');
+      if (emailContainers.length === 0) return;
 
-      if (!hasScannedCurrentEmailId) {
-        // Zero-Latency First Scan: Fire instantly, completely bypass debounce
-        hasScannedCurrentEmailId = true;
-        isCurrentlyScanning = true;
-        clearTimeout(apiDebounceTimer);
-        doScan(emailContainers);
-      } else {
-        // Strict Debounce for subsequent DOM changes
-        clearTimeout(apiDebounceTimer);
-        apiDebounceTimer = setTimeout(function () {
-          if (isCurrentlyScanning) return;
-          isCurrentlyScanning = true;
-          doScan(emailContainers);
-        }, 250);
-      }
-    }
+      // Only scan if we haven't already locked the page or found a threat
+      if (isCurrentlyScanning || hasTriggeredDanger) return;
+
+      isCurrentlyScanning = true;
+      doScan(emailContainers);
+    }, 250);
   });
 
   // Start observing after a short delay to let the page settle
