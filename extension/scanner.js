@@ -10,29 +10,11 @@
   const MIN_TEXT_LENGTH = 12;
 
   let debounceTimer = null;
-  let mutationDebounce = null;
   let lastScannedText = "";
   let activeBanner = null;
   let activeOverlay = null;
   let acknowledgedTexts = new Set(); // Track texts user has chosen to proceed on
   let processedMessageIds = new Set(); // Track message IDs to prevent popup spam
-
-  // 🚨 BLINDFOLD HELPERS: Temporally disable observer to prevent loops
-  function blindfoldOn() {
-    if (window.purifaiObserver) {
-      window.purifaiObserver.disconnect();
-    }
-  }
-
-  function blindfoldOff() {
-    if (window.purifaiObserver) {
-      window.purifaiObserver.observe(document.body, {
-        childList: true,
-        subtree: true,
-        characterData: true,
-      });
-    }
-  }
 
   console.log("[PurifAI] Scanner loaded on:", window.location.href);
 
@@ -53,7 +35,6 @@
               resolve(response || { error: true });
               return;
             }
-            // Scan result received
             resolve(response.data);
           }
         );
@@ -109,7 +90,6 @@
   function getMessageId(element) {
     var container = element.closest ? element.closest('[data-message-id]') : null;
     if (container) return container.getAttribute('data-message-id');
-    // Fallback if no message ID exists (e.g., subject line)
     var text = element.textContent || element.innerText || "";
     return text.trim().substring(0, 40);
   }
@@ -117,27 +97,17 @@
   // ── UI: Glass Shield (Optimistic Lock) ────────────────────────────────────
   function showGlassShield(element) {
     if (element.querySelector('.purifai-glass-shield')) return;
-    
-    blindfoldOn();
     element.style.position = "relative";
     var shield = document.createElement("div");
     shield.className = "purifai-glass-shield";
     shield.innerHTML = '<div class="purifai-glass-spinner"></div><div>PurifAI: Scanning...</div>';
-    
-    // Prevent clicks from reaching the email
     shield.addEventListener('click', function(e) { e.stopPropagation(); e.preventDefault(); }, true);
-    
     element.appendChild(shield);
-    blindfoldOff();
   }
 
   function removeGlassShield(element) {
     var shield = element.querySelector('.purifai-glass-shield');
-    if (shield) {
-        blindfoldOn();
-        shield.remove();
-        blindfoldOff();
-    }
+    if (shield) shield.remove();
   }
 
   function showGlassShieldWarning(element, textToRetry) {
@@ -162,16 +132,10 @@
 
     retryBtn.addEventListener('click', function(e) {
       e.stopPropagation(); e.preventDefault();
-      
-      // Bypass the lock
-      isCurrentlyScanning = true;
-      
       shield.classList.remove('purifai-glass-shield-warning');
       shield.innerHTML = '<div class="purifai-glass-spinner"></div><div>PurifAI: Scanning...</div>';
       
       scanText(textToRetry).then(function(result) {
-         isCurrentlyScanning = false;
-         // Remove the shield explicitly if safe, otherwise handle normally
          if (result && result.is_safe === true) {
              removeGlassShield(element);
          }
@@ -181,15 +145,9 @@
 
     proceedBtn.addEventListener('click', function(e) {
       e.stopPropagation(); e.preventDefault();
-      
-      // Permanently dissolve Glass Shield for this thread
       var msgId = getMessageId(element) || currentEmailId;
       processedMessageIds.add(msgId);
-      hasScannedCurrentEmailId = true; // Prevent observer from re-triggering immediately
-      
-      blindfoldOn();
       removeGlassShield(element);
-      blindfoldOff();
     });
   }
 
@@ -222,11 +180,7 @@
 
   // ── UI: Show blocking overlay (full-screen confirmation popup) ────────────
   function showBlockingOverlay(element, data) {
-    // INJECTION BLOCKED
-
-    // Don't re-block if user already acknowledged this text
     if (acknowledgedTexts.has(data.text)) {
-      console.log("[PurifAI] User already acknowledged this text, showing warning only.");
       showWarningBanner(element, data);
       return;
     }
@@ -246,7 +200,6 @@
     overlay.innerHTML =
       '<div class="purifai-overlay-backdrop"></div>' +
       '<div class="purifai-overlay-card">' +
-        // Header
         '<div class="purifai-overlay-header">' +
           '<div class="purifai-overlay-icon-wrap">' +
             '<div class="purifai-overlay-icon-ring"></div>' +
@@ -255,8 +208,6 @@
           '<h2 class="purifai-overlay-title">Threat Detected</h2>' +
           '<p class="purifai-overlay-subtitle">PurifAI has identified a potential prompt injection attack in this content.</p>' +
         '</div>' +
-
-        // Risk Meter
         '<div class="purifai-overlay-risk-section">' +
           '<div class="purifai-overlay-risk-meter">' +
             '<div class="purifai-overlay-risk-number" style="color:' + risk.color + '">' + riskPct + '%</div>' +
@@ -266,8 +217,6 @@
             '</div>' +
           '</div>' +
         '</div>' +
-
-        // Details
         '<div class="purifai-overlay-details">' +
           '<div class="purifai-overlay-detail-row">' +
             '<span class="purifai-overlay-detail-label">Classification</span>' +
@@ -282,14 +231,10 @@
             '<span class="purifai-overlay-detail-value">DeBERTa v3</span>' +
           '</div>' +
         '</div>' +
-
-        // Payload Preview
         '<div class="purifai-overlay-payload">' +
           '<div class="purifai-overlay-payload-label">⚠️ Detected Malicious Content</div>' +
           '<div class="purifai-overlay-payload-text">' + previewText + '</div>' +
         '</div>' +
-
-        // Action Buttons
         '<div class="purifai-overlay-actions">' +
           '<button class="purifai-overlay-btn purifai-overlay-btn-leave" id="purifai-btn-leave">' +
             '<span class="purifai-btn-icon">🛡️</span>' +
@@ -306,21 +251,14 @@
             '</span>' +
           '</button>' +
         '</div>' +
-
-        // False positive link
         '<div class="purifai-overlay-footer">' +
           '<button class="purifai-overlay-fp-btn" id="purifai-btn-fp">Not a real threat? Report false positive</button>' +
         '</div>' +
       '</div>';
 
-    // ── Button Handlers ──
-
-    // Leave button: go back or close tab
     var leaveBtn = overlay.querySelector("#purifai-btn-leave");
     leaveBtn.addEventListener("click", function (e) {
-      e.stopPropagation();
-      e.preventDefault();
-      console.log("[PurifAI] User chose to LEAVE.");
+      e.stopPropagation(); e.preventDefault();
       if (window.history.length > 1) {
         window.history.back();
       } else {
@@ -328,27 +266,20 @@
       }
     });
 
-    // Proceed button: remove overlay, let user continue
     var proceedBtn = overlay.querySelector("#purifai-btn-proceed");
     proceedBtn.addEventListener("click", function (e) {
-      e.stopPropagation();
-      e.preventDefault();
-      console.log("[PurifAI] User chose to PROCEED despite risk.");
+      e.stopPropagation(); e.preventDefault();
       acknowledgedTexts.add(data.text);
       removeActiveOverlay();
       element.classList.remove("purifai-danger");
-      // Show a small persistent warning banner instead
       showWarningBanner(element, data);
     });
 
-    // False positive button
     var fpBtn = overlay.querySelector("#purifai-btn-fp");
     fpBtn.addEventListener("click", function (e) {
-      e.stopPropagation();
-      e.preventDefault();
+      e.stopPropagation(); e.preventDefault();
       fpBtn.textContent = "Sending…";
       fpBtn.disabled = true;
-
       sendFeedback({
         text: data.text,
         model_label: data.label,
@@ -369,12 +300,8 @@
       });
     });
 
-    // Prevent clicks on the overlay from passing through
-    overlay.addEventListener("click", function (e) {
-      e.stopPropagation();
-    });
+    overlay.addEventListener("click", function (e) { e.stopPropagation(); });
 
-    // Append to top-level document
     try {
       var targetDoc = window.top.document;
       targetDoc.body.appendChild(overlay);
@@ -384,15 +311,11 @@
     activeOverlay = overlay;
   }
 
-  // ── UI: Show floating toast warning (for acknowledged / lower-risk) ───────
   function showWarningBanner(element, data) {
-    // Showing warning banner
     removeActiveBanner();
-
     var banner = document.createElement("div");
     banner.className = "purifai-banner purifai-banner-danger";
     banner.setAttribute("id", "purifai-active-banner");
-
     banner.innerHTML =
       '<div class="purifai-banner-content">' +
         '<div class="purifai-banner-icon">🚨</div>' +
@@ -408,7 +331,6 @@
       e.stopPropagation();
       reportBtn.textContent = "Sending…";
       reportBtn.disabled = true;
-
       sendFeedback({
         text: data.text,
         model_label: data.label,
@@ -443,19 +365,14 @@
     activeBanner = banner;
   }
 
-  // ── UI: Brief green flash on safe text ───────────────────────────────────
   function showSafe(element) {
     console.log("[PurifAI] ✅ Text is safe.");
-    blindfoldOn();
     element.classList.remove("purifai-danger");
     removeActiveBanner();
     removeActiveOverlay();
     element.classList.add("purifai-safe");
-    blindfoldOff();
     setTimeout(function () { 
-      blindfoldOn();
       element.classList.remove("purifai-safe"); 
-      blindfoldOff();
     }, 1500);
   }
 
@@ -471,17 +388,12 @@
   }
 
   function removeActiveOverlay() {
-    blindfoldOn();
     if (activeOverlay) {
       try {
         activeOverlay.classList.add("purifai-overlay-exit");
         var ref = activeOverlay;
         setTimeout(function () {
-          try { 
-            blindfoldOn();
-            ref.remove(); 
-            blindfoldOff();
-          } catch (e) {}
+          try { ref.remove(); } catch (e) {}
         }, 300);
       } catch (e) {}
       activeOverlay = null;
@@ -489,17 +401,14 @@
     try {
       var old = (window.top || window).document.getElementById("purifai-blocking-overlay");
       if (old) old.remove();
-      
-      // Clear all stamps to allow fresh scans on the new view
       var stamps = document.querySelectorAll('[data-purifai-scanned]');
       for (var i = 0; i < stamps.length; i++) {
         stamps[i].removeAttribute('data-purifai-scanned');
       }
     } catch (e) {}
-    blindfoldOff();
   }
 
-  // ── Core: Handle an input event on any element ────────────────────────────
+  // ── Core: Handle an input event (Non-Gmail) ───────────────────────────────
   function handleInput(element) {
     var text = "";
     if (element.value !== undefined && element.value !== "") {
@@ -510,189 +419,102 @@
       text = element.innerText;
     }
     var trimmed = text.trim();
-
-    // handleInput called
-
-    if (trimmed.length < MIN_TEXT_LENGTH) {
-      element.classList.remove("purifai-danger");
-      removeActiveBanner();
-      return;
-    }
-
-    if (trimmed === lastScannedText) {
-      console.log("[PurifAI] Same text, skipping.");
-      return;
-    }
+    if (trimmed.length < MIN_TEXT_LENGTH || trimmed === lastScannedText) return;
     
-    var msgId = getMessageId(element);
-    if (processedMessageIds.has(msgId) && !element.isContentEditable) {
-        // Skip scanning if we've already processed this rendered email body
-        // (We still scan contentEditable inputs continuously as the user types)
-        return;
-    }
-
     lastScannedText = trimmed;
-
-    // Scanning text
-    
     showGlassShield(element);
-
     scanText(trimmed).then(function (result) {
       handleScanResponse(result, element, trimmed);
     });
   }
 
-  // ── Watch all normal inputs ───────────────────────────────────────────────
   document.addEventListener("input", function (e) {
     var t = e.target;
     if (!t) return;
-
-    var isText =
-      t.tagName === "TEXTAREA" ||
-      (t.tagName === "INPUT" && /^(text|search|url|)$/i.test(t.type || "")) ||
-      t.isContentEditable ||
-      t.getAttribute("contenteditable") === "true";
-
+    var isText = t.tagName === "TEXTAREA" || (t.tagName === "INPUT" && /^(text|search|url|)$/i.test(t.type || "")) || t.isContentEditable || t.getAttribute("contenteditable") === "true";
     if (!isText) return;
-
-    console.log("[PurifAI] Input event on:", t.tagName, t.className);
-
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(function () { handleInput(t); }, DEBOUNCE_MS);
   }, true);
 
-  // ── Watch contenteditable divs (Gmail, ChatGPT, Claude, etc.) ─────────────
-  document.addEventListener("keyup", function (e) {
-    var t = e.target;
-    if (!t) return;
-    if (!t.isContentEditable && t.getAttribute("contenteditable") !== "true") return;
-
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(function () { handleInput(t); }, DEBOUNCE_MS);
-  }, true);
-
-  // ── Gmail-Specific Observer for Email Bodies ──────────────────────────────
-  // 🚨 SINGLETON STATE: Prevent thread burst spam
-  let globalScanTimer = null;
+  // ── Gmail-Specific: Single-Shot Hash Listener Architecture ────────────────
+  let navigationTimer = null;
   let isFetching = false;
   let currentEmailId = null;
   let hasTriggeredDanger = false;
-  let hasScannedCurrentEmailId = false;
 
-  function executeScanCycle() {
-    if (isFetching || hasTriggeredDanger) return;
-
-    // Step 2: Find all target containers
-    // We target .a3s (body) and h2.hP (subject)
-    var allPotential = document.querySelectorAll('.a3s.aiL:not([data-purifai-scanned]), h2.hP:not([data-purifai-scanned])');
-    
-    if (allPotential.length === 0) return;
-
-    // 🚨 SINGLETON RULE: Only target the LAST (newest) element to avoid burst spam
-    var targetNode = allPotential[allPotential.length - 1];
-    
-    // Step 3: Lock the node instantly
-    isFetching = true;
-    blindfoldOn();
-    targetNode.setAttribute('data-purifai-scanned', 'pending');
-    blindfoldOff();
-
-    // Prepare text for scanning
-    var combinedText = "";
-    var clone = targetNode.cloneNode(true);
-    var junks = clone.querySelectorAll('style, script');
-    for (var i = 0; i < junks.length; i++) junks[i].remove();
-    var text = clone.innerText || clone.textContent || "";
-    combinedText = text.trim();
-
-    if (combinedText.length < MIN_TEXT_LENGTH) {
-      blindfoldOn();
-      targetNode.setAttribute('data-purifai-scanned', 'complete');
-      blindfoldOff();
-      isFetching = false;
-      return;
-    }
-
-    var mainElement = targetNode.closest('.gs') || targetNode;
-    showGlassShield(mainElement);
-
-    scanText(combinedText).then(function (result) {
-      // Step 4: Resolution
-      blindfoldOn();
-      targetNode.setAttribute('data-purifai-scanned', 'complete');
-      blindfoldOff();
-      isFetching = false;
-      
-      if (mainElement) {
-        handleScanResponse(result, mainElement, combinedText);
-      }
-    }).catch(function() {
-      blindfoldOn();
-      targetNode.setAttribute('data-purifai-scanned', 'complete');
-      blindfoldOff();
-      isFetching = false;
-    });
-  }
-
-  window.purifaiObserver = new MutationObserver(function (mutations) {
-    // 🚨 TRANSITION CHECK: Reset state when switching emails (Instantly)
-    var newEmailId = window.location.hash;
-    if (newEmailId !== currentEmailId) {
-      currentEmailId = newEmailId;
+  function handleNavigation() {
+    // 🚨 TRANSITION: Reset state when switching emails
+    var newHash = window.location.hash;
+    if (newHash !== currentEmailId) {
+      currentEmailId = newHash;
       hasTriggeredDanger = false;
       isFetching = false;
       removeActiveOverlay();
     }
 
-    // 🚨 DUMB DEBOUNCE: Trailing Edge Singleton
-    clearTimeout(globalScanTimer);
-    globalScanTimer = setTimeout(executeScanCycle, 500);
-  });
+    // 🚨 SINGLE-SHOT: Wait for Gmail to render the email body
+    clearTimeout(navigationTimer);
+    navigationTimer = setTimeout(function() {
+      if (isFetching || hasTriggeredDanger) return;
 
-  // Start observing after a short delay to let the page settle
-  setTimeout(function () {
-    if (document.body) {
-      window.purifaiObserver.observe(document.body, {
-        childList: true,
-        subtree: true,
-        characterData: true,
+      // Target the newest email body (.a3s) that hasn't been scanned
+      var bodies = document.querySelectorAll('.a3s.aiL:not([data-purifai-scanned]), h2.hP:not([data-purifai-scanned])');
+      if (bodies.length === 0) return;
+
+      var targetNode = bodies[bodies.length - 1];
+      
+      // Step 1: Stamp 'pending' instantly
+      isFetching = true;
+      targetNode.setAttribute('data-purifai-scanned', 'pending');
+
+      // Step 2: Extract text
+      var clone = targetNode.cloneNode(true);
+      var junks = clone.querySelectorAll('style, script');
+      for (var i = 0; i < junks.length; i++) junks[i].remove();
+      var combinedText = (clone.innerText || clone.textContent || "").trim();
+
+      if (combinedText.length < MIN_TEXT_LENGTH) {
+        targetNode.setAttribute('data-purifai-scanned', 'complete');
+        isFetching = false;
+        return;
+      }
+
+      var mainElement = targetNode.closest('.gs') || targetNode;
+      showGlassShield(mainElement);
+
+      // Step 3: Fetch API
+      scanText(combinedText).then(function (result) {
+        targetNode.setAttribute('data-purifai-scanned', 'complete');
+        isFetching = false;
+        if (mainElement) {
+          handleScanResponse(result, mainElement, combinedText);
+        }
+      }).catch(function() {
+        targetNode.setAttribute('data-purifai-scanned', 'complete');
+        isFetching = false;
       });
-      console.log("[PurifAI] Gmail MutationObserver started.");
-    }
-  }, 1000);
+    }, 800); 
+  }
 
-  // ── Listen for interceptor-level blocks (network layer) ───────────────────
-  // When interceptor.js (MAIN world) detects and redacts a malicious payload
-  // from a fetch/XHR response, it posts this event so we can show the
-  // blocking overlay to the user.
+  // Listen for navigation in Gmail (SPA)
+  window.addEventListener('hashchange', handleNavigation);
+  
+  // Initial load execution
+  if (window.location.hostname.includes("mail.google.com")) {
+    handleNavigation();
+  }
+
+  // ── Network Interception Listener ─────────────────────────────────────────
   window.addEventListener("message", function (event) {
-    if (event.source !== window) return;
-    if (!event.data || event.data.type !== "PURIFAI_INTERCEPT_BLOCKED") return;
-
+    if (event.source !== window || !event.data || event.data.type !== "PURIFAI_INTERCEPT_BLOCKED") return;
     var blockData = event.data.data;
     if (!blockData) return;
-
-    // Network-level interception received
-
-    // Build a scan result object compatible with showBlockingOverlay
-    var fakeResult = {
-      text: blockData.text || "",
-      confidence: blockData.confidence || 0.99,
-      label: blockData.label || "INJECTION",
-      is_safe: false,
-    };
-
-    // Use document.body as the element since the malicious text was
-    // intercepted at the network level (never hit the DOM)
-    var target = document.body || document.documentElement;
-    showBlockingOverlay(target, fakeResult);
+    var fakeResult = { text: blockData.text || "", confidence: blockData.confidence || 0.99, label: blockData.label || "INJECTION", is_safe: false };
+    showBlockingOverlay(document.body || document.documentElement, fakeResult);
   });
 
-  // ── Signal to interceptor.js that scanner is ready ────────────────────────
-  // interceptor.js (MAIN world) queues PURIFAI_INTERCEPT_BLOCKED events
-  // until it receives this signal, solving the race condition where
-  // injections are detected during page load before scanner.js is loaded.
   window.postMessage({ type: "PURIFAI_SCANNER_READY" }, "*");
-  console.log("[PurifAI] Scanner ready — notified interceptor.");
+  console.log("[PurifAI] Scanner ready (Single-Shot Architecture).");
 
 })();
