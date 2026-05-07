@@ -15,3 +15,8 @@ python-multipart>=0.0.9
 
 # Utilities
 # hashlib, os, datetime, uuid — stdlib
+
+# AI / ML Local Inference
+transformers>=4.40.0
+torch --index-url https://download.pytorch.org/whl/cpu
+accelerate>=0.26.0

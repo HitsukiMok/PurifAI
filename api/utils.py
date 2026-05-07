@@ -1,25 +1,37 @@
 import os
 import re
 import hashlib
-import requests
 from supabase import create_client, Client
 from fastapi import HTTPException
+from transformers import pipeline
 
 # ── Environment Config ────────────────────────────────────────────────────────
-HF_TOKEN = os.getenv("HUGGINGFACE_API_KEY")
-HF_MODEL = "ProtectAI/deberta-v3-base-prompt-injection-v2"
-HF_URL = f"https://api-inference.huggingface.co/models/{HF_MODEL}"
-
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 # ── Supabase Client ──────────────────────────────────────────────────────────
 def get_supabase() -> Client:
     if not SUPABASE_URL or not SUPABASE_KEY:
-        raise Exception("Supabase credentials missing from environment.")
+        # For local testing, we might not have these, but they are needed for production
+        print("Warning: Supabase credentials missing.")
+        return None
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ── Regexes from main.py ──────────────────────────────────────────────────────
+# ── Local AI Model Initialization (Global) ────────────────────────────────────
+# This loads the model ONCE when the server starts. 
+# HF Spaces provide 16GB RAM, enough for DeBERTa v3.
+HF_MODEL = "ProtectAI/deberta-v3-base-prompt-injection-v2"
+
+print(f"[PurifAI] Initializing local inference pipeline with model: {HF_MODEL}")
+try:
+    # Use CPU by default. For GPU, use device=0
+    classifier = pipeline("text-classification", model=HF_MODEL)
+    print("[PurifAI] Model loaded successfully.")
+except Exception as e:
+    print(f"[PurifAI] CRITICAL: Failed to load model: {e}")
+    classifier = None
+
+# ── Regexes ──────────────────────────────────────────────────────────────────
 MARKETING_REGEX = re.compile(
     r"(unsubscribe|view in browser|manage preferences|opt-out|newsletter|privacy policy|click here to unsubscribe)", 
     re.IGNORECASE
@@ -30,56 +42,43 @@ HIGH_DANGER_REGEX = re.compile(
     re.IGNORECASE
 )
 
-# ── Hugging Face Client ──────────────────────────────────────────────────────
+# ── Local Inference Logic ────────────────────────────────────────────────────
 def query_huggingface(text: str):
     """
-    Sends text to Hugging Face Inference API.
-    Handles 503 Service Unavailable (Warming Up) gracefully.
+    Runs inference locally using the DeBERTa v3 model.
+    Replaces the previous remote HTTP Inference API calls.
     """
-    if not HF_TOKEN:
-        raise HTTPException(status_code=500, detail="Hugging Face API key missing.")
-
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    payload = {"inputs": text, "options": {"wait_for_model": False}}
+    if classifier is None:
+        return {"error": "Model not loaded", "warming_up": False}
 
     try:
-        response = requests.post(HF_URL, headers=headers, json=payload, timeout=8)
+        # Run local inference
+        # The pipeline returns: [{"label": "SAFE", "score": 0.99...}]
+        results = classifier(text)
         
-        # Check for Cold Start (503)
-        if response.status_code == 503:
-            data = response.json()
-            est_time = data.get("estimated_time", 20)
-            return {
-                "warming_up": True,
-                "message": "AI is waking up. Please try scanning again in 15 seconds.",
-                "estimated_time": est_time
-            }
-
-        if response.status_code != 200:
-            # 🚨 HARD ERROR CATCH: Don't try to parse JSON if status is not 200
-            print(f"HF API non-200 response: {response.status_code}")
-            return {"error": "hf_overload", "warming_up": False}
-
-        try:
-            results = response.json()
-        except Exception as e:
-            # 🚨 DEEP JSON CATCH: HF sometimes returns HTML on 429/500
-            print(f"HF JSON Parsing failed: {e}")
-            return {"error": "hf_overload", "warming_up": False}
-
-        # HF returns a list of lists: [[{"label": "SAFE", "score": 0.99}, ...]]
         if isinstance(results, list) and len(results) > 0:
-            predictions = results[0]
-            return {p["label"]: p["score"] for p in predictions}
+            # We transform this into the dictionary format expected by scan.py
+            # Format: {"SAFE": 0.99, "INJECTION": 0.01}
+            formatted = {}
+            for res in results:
+                # Some versions of transformers return a single dict for single string
+                # Some return a list of dicts. We handle both.
+                if isinstance(res, dict):
+                    formatted[res["label"]] = res["score"]
+            
+            # Note: If the model only returns the top class, we might need to 
+            # ensure 'SAFE' and 'INJECTION' keys exist for the threshold logic in scan.py
+            if "SAFE" not in formatted: formatted["SAFE"] = 0.0
+            if "INJECTION" not in formatted: formatted["INJECTION"] = 0.0
+            
+            return formatted
         
-        return results
-    except requests.exceptions.Timeout:
-        return {"warming_up": True, "error": "timeout"}
+        return {"error": "Inference returned empty results"}
     except Exception as e:
-        print(f"Inference error in utils.py: {str(e)}")
-        return {"error": "hf_unknown", "warming_up": False}
+        print(f"[PurifAI] Local inference error: {str(e)}")
+        return {"error": str(e)}
 
-# ── Text Processing ─────────────────────────────────────────────────────────
+# ── Text Processing Helpers ──────────────────────────────────────────────────
 def clean_text(text: str) -> str:
     # 1. HTML Stripping
     cleaned = re.sub(r'<[^>]+>', ' ', text).strip()
@@ -94,8 +93,7 @@ def get_text_hash(text: str) -> str:
     return hashlib.sha256(text.encode('utf-8')).hexdigest()
 
 def chunk_text(text: str, chunk_size=400, overlap=50):
-    """Split text into overlapping blocks of ~chunk_size words.
-    Overlap prevents missing injections that span chunk boundaries."""
+    """Split text into overlapping blocks."""
     words = text.split()
     if len(words) <= chunk_size:
         return [text]

@@ -1,4 +1,4 @@
-const API_BASE = "https://purifai-api.vercel.app";
+const API_BASE = "https://YOUR-HF-USER-NAME-HERE-purifai-api.hf.space";
 
 // Helper for fetch with timeout
 async function fetchWithTimeout(resource, options = {}) {
