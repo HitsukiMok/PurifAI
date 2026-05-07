@@ -1,5 +1,5 @@
 import type { TrafficRow } from "@/lib/mock-traffic";
-import { ShieldAlert, ShieldCheck } from "lucide-react";
+import { ShieldAlert, ShieldCheck, ScanSearch } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function riskColor(risk: number) {
@@ -21,6 +21,7 @@ function riskLabel(risk: number) {
 }
 
 export function AttackInspectionPanel({ attack }: { attack: TrafficRow }) {
+  const blocked = attack.status === "Blocked";
   const before = attack.raw ?? "";
   const payload = attack.payload ?? "";
   const after = payload
@@ -33,12 +34,23 @@ export function AttackInspectionPanel({ attack }: { attack: TrafficRow }) {
     <div className="flex h-full flex-col rounded-xl border bg-card">
       <div className="flex items-center justify-between border-b px-4 py-3 sm:px-5 sm:py-4">
         <div className="flex items-center gap-2">
-          <ShieldAlert className="h-4 w-4 text-danger" />
-          <h2 className="text-sm font-semibold tracking-tight">Attack Inspection</h2>
+          {blocked ? (
+            <ShieldAlert className="h-4 w-4 text-danger" />
+          ) : (
+            <ScanSearch className="h-4 w-4 text-success" />
+          )}
+          <h2 className="text-sm font-semibold tracking-tight">
+            {blocked ? "Attack Inspection" : "Scan Details"}
+          </h2>
         </div>
-        {attack.technique && (
+        {blocked && attack.technique && (
           <span className="rounded-full bg-danger/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-danger ring-1 ring-danger/30 truncate max-w-[120px] sm:max-w-none">
             {attack.technique}
+          </span>
+        )}
+        {!blocked && (
+          <span className="rounded-full bg-success/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-success ring-1 ring-success/25">
+            Clean
           </span>
         )}
       </div>
@@ -47,7 +59,6 @@ export function AttackInspectionPanel({ attack }: { attack: TrafficRow }) {
         <Meta label="Time" value={attack.time} mono />
         <div>
           <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Risk Score</p>
-          {/* Risk percentage with bar */}
           <div className="mt-1 flex items-center gap-2">
             <span className={cn("font-mono text-sm font-bold", riskColor(attack.risk))}>
               {attack.risk}%
@@ -68,38 +79,67 @@ export function AttackInspectionPanel({ attack }: { attack: TrafficRow }) {
       </div>
 
       <div className="flex-1 space-y-4 overflow-auto p-4 sm:p-5">
+        {/* Raw ingestion section */}
         <div>
           <div className="mb-2 flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-danger" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-danger">
-              Before · Raw Ingestion
+            <span className={cn("h-1.5 w-1.5 rounded-full", blocked ? "bg-danger" : "bg-success")} />
+            <span className={cn(
+              "text-[10px] font-semibold uppercase tracking-[0.18em]",
+              blocked ? "text-danger" : "text-success",
+            )}>
+              {blocked ? "Before · Raw Ingestion" : "Scanned Content"}
             </span>
           </div>
-          <pre className="whitespace-pre-wrap rounded-lg border border-danger/30 bg-danger/5 p-3 font-mono text-xs leading-relaxed text-foreground/90">
-            {parts.map((part, i) => (
-              <span key={i}>
-                {part}
-                {i < parts.length - 1 && (
-                  <mark className="rounded bg-danger/30 px-1 text-danger ring-1 ring-danger/50">
-                    {payload}
-                  </mark>
-                )}
-              </span>
-            ))}
+          <pre className={cn(
+            "whitespace-pre-wrap rounded-lg border p-3 font-mono text-xs leading-relaxed text-foreground/90",
+            blocked
+              ? "border-danger/30 bg-danger/5"
+              : "border-success/20 bg-success/5",
+          )}>
+            {before ? (
+              parts.map((part, i) => (
+                <span key={i}>
+                  {part}
+                  {i < parts.length - 1 && (
+                    <mark className="rounded bg-danger/30 px-1 text-danger ring-1 ring-danger/50">
+                      {payload}
+                    </mark>
+                  )}
+                </span>
+              ))
+            ) : (
+              <span className="text-muted-foreground italic">No content captured for this scan.</span>
+            )}
           </pre>
         </div>
 
-        <div>
-          <div className="mb-2 flex items-center gap-2">
-            <ShieldCheck className="h-3 w-3 text-success" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-success">
-              After · Sanitized for Agent
-            </span>
+        {/* Sanitized section — only for blocked rows */}
+        {blocked && (
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <ShieldCheck className="h-3 w-3 text-success" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-success">
+                After · Sanitized for Agent
+              </span>
+            </div>
+            <pre className="whitespace-pre-wrap rounded-lg border border-success/30 bg-success/5 p-3 font-mono text-xs leading-relaxed text-foreground/90">
+              {after}
+            </pre>
           </div>
-          <pre className="whitespace-pre-wrap rounded-lg border border-success/30 bg-success/5 p-3 font-mono text-xs leading-relaxed text-foreground/90">
-            {after}
-          </pre>
-        </div>
+        )}
+
+        {/* Clean scan verdict */}
+        {!blocked && (
+          <div className="flex items-center gap-3 rounded-lg border border-success/20 bg-success/5 px-4 py-3">
+            <ShieldCheck className="h-5 w-5 text-success shrink-0" />
+            <div>
+              <p className="text-xs font-semibold text-success">No Threats Detected</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                This content was scanned by DeBERTa v3 and classified as safe.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
