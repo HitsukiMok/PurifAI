@@ -1,13 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# 🧪 Step 1: Reintroducing routers one-by-one to catch the culprit
+# 🚀 Final Reconnection: All modules are confirmed safe
 from .scan import router as scan_router
-# from .scan_file import router as scan_file_router
-# from .traffic import router as traffic_router
-# from .metrics import router as metrics_router
-# from .feedback import router as feedback_router
-# from .feedback_stats import router as feedback_stats_router
+from .scan_file import router as scan_file_router
+from .traffic import router as traffic_router
+from .metrics import router as metrics_router
+from .feedback import router as feedback_router
+from .feedback_stats import router as feedback_stats_router
 
 app = FastAPI(title="PurifAI API")
 
@@ -20,14 +20,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include the routers (Reintroducing ONLY scan for now)
+# Include all routers
 app.include_router(scan_router, prefix="/api")
-# app.include_router(scan_file_router, prefix="/api")
-# app.include_router(traffic_router, prefix="/api")
-# app.include_router(metrics_router, prefix="/api")
-# app.include_router(feedback_router, prefix="/api")
-# app.include_router(feedback_stats_router, prefix="/api")
+app.include_router(scan_file_router, prefix="/api")
+app.include_router(traffic_router, prefix="/api")
+app.include_router(metrics_router, prefix="/api")
+app.include_router(feedback_router, prefix="/api")
+app.include_router(feedback_stats_router, prefix="/api")
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "alive", "message": "Vercel Python is working!"}
+    return {"status": "alive", "message": "PurifAI Serverless Backend is fully operational!"}
