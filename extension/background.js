@@ -97,12 +97,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: msg.text }),
       })
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) return Promise.reject({ status: r.status, message: `HTTP Error ${r.status}` });
+          return r.json();
+        })
         .then((data) => {
           handleScanResult(data, sender);
           sendResponse({ ok: true, data });
         })
-        .catch((err) => sendResponse({ ok: false, error: err.message }));
+        .catch((err) => sendResponse({ ok: false, error: err.message || "Unknown error", status: err.status }));
     }
 
     else if (msg.type === "PURIFAI_FEEDBACK_REQUEST") {

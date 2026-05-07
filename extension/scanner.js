@@ -6,7 +6,7 @@
 (function () {
   "use strict";
 
-  const DEBOUNCE_MS = 900;
+  const DEBOUNCE_MS = 500;
   const MIN_TEXT_LENGTH = 12;
 
   let debounceTimer = null;
@@ -15,6 +15,7 @@
   let activeBanner = null;
   let activeOverlay = null;
   let acknowledgedTexts = new Set(); // Track texts user has chosen to proceed on
+  let processedMessageIds = new Set(); // Track message IDs to prevent popup spam
 
   console.log("[PurifAI] Scanner loaded on:", window.location.href);
 
@@ -32,7 +33,7 @@
             }
             if (!response || !response.ok) {
               console.warn("[PurifAI] Bad response:", response);
-              resolve(null);
+              resolve(response || { error: true });
               return;
             }
             console.log("[PurifAI] Scan result:", response.data);
@@ -86,6 +87,96 @@
   function truncateText(text, maxLen) {
     if (text.length <= maxLen) return text;
     return text.substring(0, maxLen) + "…";
+  }
+
+  function getMessageId(element) {
+    var container = element.closest ? element.closest('[data-message-id]') : null;
+    if (container) return container.getAttribute('data-message-id');
+    // Fallback if no message ID exists (e.g., subject line)
+    var text = element.textContent || element.innerText || "";
+    return text.trim().substring(0, 40);
+  }
+
+  // ── UI: Glass Shield (Optimistic Lock) ────────────────────────────────────
+  function showGlassShield(element) {
+    if (element.querySelector('.purifai-glass-shield')) return;
+    element.style.position = "relative";
+    var shield = document.createElement("div");
+    shield.className = "purifai-glass-shield";
+    shield.innerHTML = '<div class="purifai-glass-spinner"></div><div>PurifAI: Scanning...</div>';
+    
+    // Prevent clicks from reaching the email
+    shield.addEventListener('click', function(e) { e.stopPropagation(); e.preventDefault(); }, true);
+    
+    element.appendChild(shield);
+  }
+
+  function removeGlassShield(element) {
+    var shield = element.querySelector('.purifai-glass-shield');
+    if (shield) shield.remove();
+  }
+
+  function showGlassShieldWarning(element, textToRetry) {
+    var shield = element.querySelector('.purifai-glass-shield');
+    if (!shield) {
+        showGlassShield(element);
+        shield = element.querySelector('.purifai-glass-shield');
+    }
+    
+    shield.classList.add('purifai-glass-shield-warning');
+    shield.innerHTML = `
+      <div style="font-size:24px">⚠️</div>
+      <div>Scan unavailable (Server Busy). Proceed with caution.</div>
+      <div class="purifai-glass-btn-group">
+        <button class="purifai-glass-btn purifai-glass-btn-retry">Retry Scan</button>
+        <button class="purifai-glass-btn purifai-glass-btn-proceed">Read Anyway</button>
+      </div>
+    `;
+
+    var retryBtn = shield.querySelector('.purifai-glass-btn-retry');
+    var proceedBtn = shield.querySelector('.purifai-glass-btn-proceed');
+
+    retryBtn.addEventListener('click', function(e) {
+      e.stopPropagation(); e.preventDefault();
+      shield.classList.remove('purifai-glass-shield-warning');
+      shield.innerHTML = '<div class="purifai-glass-spinner"></div><div>PurifAI: Scanning...</div>';
+      
+      scanText(textToRetry).then(function(result) {
+         handleScanResponse(result, element, textToRetry);
+      });
+    });
+
+    proceedBtn.addEventListener('click', function(e) {
+      e.stopPropagation(); e.preventDefault();
+      removeGlassShield(element);
+    });
+  }
+
+  function handleScanResponse(result, element, originalText) {
+    if (result && result.status === 429) {
+      showGlassShieldWarning(element, originalText);
+      return;
+    }
+    
+    if (!result || result.error) {
+      removeGlassShield(element);
+      console.warn("[PurifAI] Scan failed or returned error:", result);
+      return;
+    }
+
+    removeGlassShield(element);
+
+    var msgId = getMessageId(element);
+    if (!element.isContentEditable) {
+      processedMessageIds.add(msgId);
+    }
+
+    if (result.is_safe === false) {
+      hasTriggeredDanger = true;
+      showBlockingOverlay(element, result);
+    } else {
+      showSafe(element);
+    }
   }
 
   // ── UI: Show blocking overlay (full-screen confirmation popup) ────────────
@@ -373,22 +464,22 @@
       console.log("[PurifAI] Same text, skipping.");
       return;
     }
+    
+    var msgId = getMessageId(element);
+    if (processedMessageIds.has(msgId) && !element.isContentEditable) {
+        // Skip scanning if we've already processed this rendered email body
+        // (We still scan contentEditable inputs continuously as the user types)
+        return;
+    }
+
     lastScannedText = trimmed;
 
     console.log("[PurifAI] Scanning text:", trimmed.substring(0, 80) + "...");
+    
+    showGlassShield(element);
 
     scanText(trimmed).then(function (result) {
-      if (!result || result.error) {
-        console.warn("[PurifAI] Scan failed or returned error:", result);
-        return;
-      }
-
-      if (result.is_safe === false) {
-        // BLOCK with full overlay — not just a warning
-        showBlockingOverlay(element, result);
-      } else {
-        showSafe(element);
-      }
+      handleScanResponse(result, element, trimmed);
     });
   }
 
@@ -421,16 +512,100 @@
     debounceTimer = setTimeout(function () { handleInput(t); }, DEBOUNCE_MS);
   }, true);
 
-  // MutationObserver as final fallback
-  var observer = new MutationObserver(function () {
-    var editable = document.activeElement;
-    if (!editable) return;
-    if (!editable.isContentEditable &&
-        editable.getAttribute("contenteditable") !== "true" &&
-        editable.tagName !== "TEXTAREA") return;
+  // ── Gmail-Specific Observer for Email Bodies ──────────────────────────────
+  let currentEmailId = null;
+  let hasTriggeredDanger = false;
+  let isCurrentlyScanning = false;
+  let apiDebounceTimer = null;
 
-    clearTimeout(mutationDebounce);
-    mutationDebounce = setTimeout(function () { handleInput(editable); }, DEBOUNCE_MS);
+  var observer = new MutationObserver(function (mutations) {
+    // ── The Circuit Breaker: Short-Circuit Logic ──
+    var newEmailId = window.location.hash;
+    if (newEmailId !== currentEmailId) {
+      currentEmailId = newEmailId;
+      hasTriggeredDanger = false;
+      removeActiveOverlay();
+    }
+
+    if (hasTriggeredDanger) {
+      return; // Do absolutely nothing if danger already triggered for this thread
+    }
+    
+    // Clear the timeout: Every time the MutationObserver fires
+    clearTimeout(apiDebounceTimer);
+
+    var foundRelevantChange = false;
+    for (var i = 0; i < mutations.length; i++) {
+      var m = mutations[i];
+      
+      // ── UI Blindspot: Ignore our own UI wrappers ──
+      var target = m.target;
+      if (target.nodeType === Node.ELEMENT_NODE) {
+          if (target.className && typeof target.className === 'string' && target.className.includes('purifai-')) continue;
+          if (target.closest && target.closest('[class*="purifai-"]')) continue;
+      } else if (target.parentNode && target.parentNode.nodeType === Node.ELEMENT_NODE) {
+          if (target.parentNode.closest && target.parentNode.closest('[class*="purifai-"]')) continue;
+      }
+
+      var hasPurifaiNode = false;
+      for (var j = 0; j < m.addedNodes.length; j++) {
+         var n = m.addedNodes[j];
+         if (n.nodeType === Node.ELEMENT_NODE && n.className && typeof n.className === 'string' && n.className.includes('purifai-')) {
+             hasPurifaiNode = true;
+             break;
+         }
+      }
+      if (hasPurifaiNode) continue;
+
+      if (m.addedNodes.length > 0 || m.type === 'characterData') {
+        foundRelevantChange = true;
+        break;
+      }
+    }
+
+    if (foundRelevantChange) {
+      // Implement a strict 250ms Debounce Timer
+      apiDebounceTimer = setTimeout(function () {
+        // Preserve the Lock: set to true exactly when timer executes
+        if (isCurrentlyScanning) return;
+        isCurrentlyScanning = true;
+
+        var emailContainers = document.querySelectorAll('.a3s.aiL, h2.hP');
+        var combinedText = "";
+        var mainElement = null;
+
+        emailContainers.forEach(function (container) {
+          // Precision DOM Targeting: Use innerText to ignore hidden scripts (<script>, <style>)
+          var text = container.innerText || "";
+          if (text.trim()) {
+              combinedText += text.trim() + "\n";
+              if (!mainElement) mainElement = container;
+          }
+        });
+
+        var trimmed = combinedText.trim();
+        if (trimmed.length < MIN_TEXT_LENGTH || trimmed === lastScannedText) {
+          isCurrentlyScanning = false;
+          return;
+        }
+
+        var msgId = mainElement ? getMessageId(mainElement) : currentEmailId;
+        if (processedMessageIds.has(msgId)) {
+          isCurrentlyScanning = false;
+          return;
+        }
+
+        lastScannedText = trimmed;
+        if (mainElement) showGlassShield(mainElement);
+
+        scanText(trimmed).then(function (result) {
+          isCurrentlyScanning = false;
+          if (mainElement) {
+              handleScanResponse(result, mainElement, trimmed);
+          }
+        });
+      }, 250);
+    }
   });
 
   // Start observing after a short delay to let the page settle
@@ -441,7 +616,7 @@
         subtree: true,
         characterData: true,
       });
-      console.log("[PurifAI] MutationObserver started.");
+      console.log("[PurifAI] Gmail MutationObserver started.");
     }
   }, 1000);
 

@@ -45,7 +45,7 @@ export function useBackendPolling() {
       // seenIds deduplication prevents double-counting.
       const sinceParam = Math.max(0, lastTimestamp.current - LOOKBACK_BUFFER);
       const res = await fetch(
-        `${API_BASE}/api/recent-scans?since=${sinceParam}`
+        `${API_BASE}/api/traffic?since=${sinceParam}`
       );
       if (!res.ok) {
         setBackendOnline(false);

@@ -1,11 +1,15 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
 import torch
 import csv
 import os
+import re
+import hashlib
+import functools
 from datetime import datetime
+import time
 
 import logging
 
@@ -48,25 +52,91 @@ def get_classifier():
             raise e
     return classifier
 
+MARKETING_REGEX = re.compile(
+    r"(unsubscribe|view in browser|manage preferences|opt-out|newsletter|privacy policy|click here to unsubscribe)", 
+    re.IGNORECASE
+)
+
+HIGH_DANGER_REGEX = re.compile(
+    r"(ignore all previous instructions|system override|jailbreak|you are now)",
+    re.IGNORECASE
+)
+
+@functools.lru_cache(maxsize=500)
+def cached_inference(text_hash: str, cleaned_text: str):
+    """
+    We pass text_hash to ensure LRU cache key uniqueness based on the hash,
+    while using the cleaned_text for actual inference.
+    """
+    model_pipeline = get_classifier()
+    result = model_pipeline(cleaned_text)
+    return result[0]
+
 class ScanRequest(BaseModel):
     text: str
 
+CLIENT_RATE_LIMITS = {}
+
 @app.post("/api/scan")
-async def scan_text(request: ScanRequest):
+async def scan_text(request: ScanRequest, http_request: Request):
+    # Rate Limiting: Max 1 scan per 2 seconds per IP
+    client_ip = http_request.client.host
+    now = time.time()
+    last_scan = CLIENT_RATE_LIMITS.get(client_ip, 0)
+    
+    if now - last_scan < 2:
+        logger.warning(f"Rate limit exceeded for IP {client_ip}")
+        raise HTTPException(status_code=429, detail="Too Many Requests", headers={"Retry-After": "2"})
+        
+    CLIENT_RATE_LIMITS[client_ip] = now
+
     logger.info(f"Received scan request. Length: {len(request.text)} chars")
     try:
-        model_pipeline = get_classifier()
-        result = model_pipeline(request.text)
-        prediction = result[0]
-        is_safe = (prediction['label'] == 'SAFE')
+        # 1. HTML Stripping for cleaner inference
+        cleaned_text = re.sub(r'<[^>]+>', ' ', request.text).strip()
         
-        logger.info(f"Scan complete. Result: {prediction['label']} ({prediction['score']:.4f})")
+        # 1b. Fuzzy Deduplication: Strip volatile timestamps and headers
+        fuzzy_text = re.sub(r'On\s+(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun).*?wrote:', '', cleaned_text, flags=re.IGNORECASE)
+        fuzzy_text = re.sub(r'\d{1,2}:\d{2}\s*(?:AM|PM)?', '', fuzzy_text, flags=re.IGNORECASE)
+        fuzzy_text = re.sub(r'\d{4}-\d{2}-\d{2}', '', fuzzy_text)
+        fuzzy_text = fuzzy_text.strip()
+        
+        # 2. Caching via SHA-256
+        text_hash = hashlib.sha256(fuzzy_text.encode('utf-8')).hexdigest()
+        
+        # 3. Model Inference (cached)
+        prediction = cached_inference(text_hash, cleaned_text)
+        label = prediction['label']
+        confidence = prediction['score']
+        is_safe = (label == 'SAFE')
+        
+        heuristic_applied = "None"
+        
+        # 4. False Positive Mitigations (Downgrade Logic) & High-Danger Veto
+        if not is_safe:
+            has_high_danger = HIGH_DANGER_REGEX.search(cleaned_text) is not None
+            
+            if has_high_danger:
+                heuristic_applied = "Veto (High Danger)"
+            else:
+                word_count = len(cleaned_text.split())
+                has_marketing = MARKETING_REGEX.search(cleaned_text) is not None
+                
+                if word_count < 50 or has_marketing:
+                    heuristic_applied = "Downgraded (Marketing/Short)"
+                    is_safe = True
+                    label = 'SAFE (Marketing)'
+
+        logger.info(f"[DEBUG] Raw Text Sent to Model: {cleaned_text[:200]}...")
+        logger.info(f"[DEBUG] Model Score: {confidence:.4f}")
+        logger.info(f"[DEBUG] Heuristic Applied: {heuristic_applied}")
+        logger.info(f"Scan complete. Result: {label} ({confidence:.4f})")
 
         scan_result = {
-            "text": request.text,
+            "text": request.text,  # Return original text to extension
             "is_safe": is_safe,
-            "label": prediction['label'],
-            "confidence": prediction['score']
+            "label": label,
+            "confidence": confidence
         }
 
         # Log to in-memory scan history for dashboard
@@ -76,8 +146,8 @@ async def scan_text(request: ScanRequest):
             "timestamp": time.time(),
             "time": datetime.now().strftime("%H:%M:%S"),
             "text": request.text[:200],
-            "label": prediction['label'],
-            "confidence": prediction['score'],
+            "label": label,
+            "confidence": confidence,
             "is_safe": is_safe,
             "source": "extension-scan",
         }
@@ -106,8 +176,8 @@ scan_metrics = {"scanned": 0, "blocked": 0}
 def read_root():
     return {"status": "PurifAI Backend is running"}
 
-@app.get("/api/recent-scans")
-async def recent_scans(since: float = 0):
+@app.get("/api/traffic")
+async def traffic_scans(since: float = 0):
     """Return scans newer than `since` (unix timestamp in seconds).
     The dashboard polls this every few seconds.
     Uses >= comparison to ensure boundary scans are not missed;
