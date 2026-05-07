@@ -2,8 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   Bot, Shield, AlertTriangle, Clock, MoreHorizontal,
-  Search, Filter, Activity, Plus, X, Check, Pencil, Trash2,
+  Search, Filter, Activity, Plus, X, Check, Pencil, Trash2, Flag,
 } from "lucide-react";
+import { FeedbackActionRow } from "@/components/ui/FeedbackWidget";
 
 export const Route = createFileRoute("/agents")({
   head: () => ({
@@ -141,17 +142,21 @@ function AgentModal({
 }
 
 // ── Context menu ─────────────────────────────────────────────────────────────
-function AgentMenu({ agent, onEdit, onDelete, onStatusChange, onClose }: {
+function AgentMenu({ agent, onEdit, onDelete, onStatusChange, onClose, onReportAI }: {
   agent: Agent;
   onEdit: () => void;
   onDelete: () => void;
   onStatusChange: (s: AgentStatus) => void;
   onClose: () => void;
+  onReportAI: () => void;
 }) {
   return (
-    <div className="absolute right-0 top-8 z-40 w-48 rounded-xl border border-border/60 bg-card shadow-xl py-1" onClick={(e) => e.stopPropagation()}>
+    <div className="absolute right-0 top-8 z-40 w-52 rounded-xl border border-border/60 bg-card shadow-xl py-1" onClick={(e) => e.stopPropagation()}>
       <button id={`menu-edit-${agent.id}`} onClick={() => { onEdit(); onClose(); }} className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-accent">
         <Pencil className="h-3.5 w-3.5 text-ai" /> Edit Agent
+      </button>
+      <button id={`menu-report-ai-${agent.id}`} onClick={() => { onReportAI(); onClose(); }} className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-amber-400 hover:bg-amber-400/10">
+        <Flag className="h-3.5 w-3.5" /> Report AI Output
       </button>
       {(["Active", "Idle", "Suspended"] as AgentStatus[]).filter((s) => s !== agent.status).map((s) => (
         <button key={s} id={`menu-status-${s}-${agent.id}`} onClick={() => { onStatusChange(s); onClose(); }}
@@ -176,6 +181,8 @@ function AgentsPage() {
   const [modal, setModal] = useState<{ open: boolean; agent: Agent | null }>({ open: false, agent: null });
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // Track which agent row should open FeedbackWidget modal via menu
+  const [feedbackTarget, setFeedbackTarget] = useState<Agent | null>(null);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -320,6 +327,15 @@ function AgentsPage() {
                       <span className={`text-xs font-semibold ${riskStyle[agent.risk]}`}>{agent.risk}</span>
                       <div className="h-1 w-16 rounded-full bg-muted"><div className={`h-1 rounded-full ${riskBar[agent.risk]}`} /></div>
                     </div>
+                    <FeedbackActionRow
+                      ctx={{
+                        responseId: agent.id,
+                        surface: "agents_table",
+                        input: `Agent: ${agent.name}, Type: ${agent.type}, Policy: ${agent.policy}`,
+                        output: `Risk assessment: ${agent.risk} — ${agent.blocked} blocked out of ${agent.scanned} scanned`,
+                      }}
+                      onSubmitted={() => showToast("✓ Report submitted — thank you!")}
+                    />
                   </td>
                   <td className="px-4 py-3.5 text-right hidden lg:table-cell font-mono text-muted-foreground">{agent.scanned.toLocaleString()}</td>
                   <td className="px-4 py-3.5 text-right hidden lg:table-cell font-mono font-semibold text-danger">{agent.blocked}</td>
@@ -343,6 +359,7 @@ function AgentsPage() {
                           onDelete={() => deleteAgent(agent.id)}
                           onStatusChange={(s) => changeStatus(agent.id, s)}
                           onClose={() => setOpenMenu(null)}
+                          onReportAI={() => setFeedbackTarget(agent)}
                         />
                       )}
                     </div>
@@ -358,6 +375,24 @@ function AgentsPage() {
           </div>
         )}
       </div>
+
+      {/* FeedbackWidget opened via context menu — renders its own modal */}
+      {feedbackTarget && (
+        <FeedbackActionRow
+          ctx={{
+            responseId: feedbackTarget.id,
+            surface: "agents_table_menu",
+            input: `Agent: ${feedbackTarget.name}, Type: ${feedbackTarget.type}, Policy: ${feedbackTarget.policy}`,
+            output: `Risk assessment: ${feedbackTarget.risk} — ${feedbackTarget.blocked} blocked out of ${feedbackTarget.scanned} scanned`,
+          }}
+          onSubmitted={() => {
+            showToast("✓ Report submitted — thank you!");
+            setFeedbackTarget(null);
+          }}
+          _openModalImmediately
+          _onModalClose={() => setFeedbackTarget(null)}
+        />
+      )}
     </div>
   );
 }
