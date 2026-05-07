@@ -17,6 +17,23 @@
   let acknowledgedTexts = new Set(); // Track texts user has chosen to proceed on
   let processedMessageIds = new Set(); // Track message IDs to prevent popup spam
 
+  // 🚨 BLINDFOLD HELPERS: Temporally disable observer to prevent loops
+  function blindfoldOn() {
+    if (window.purifaiObserver) {
+      window.purifaiObserver.disconnect();
+    }
+  }
+
+  function blindfoldOff() {
+    if (window.purifaiObserver) {
+      window.purifaiObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+    }
+  }
+
   console.log("[PurifAI] Scanner loaded on:", window.location.href);
 
   // ── Scan via background proxy ─────────────────────────────────────────────
@@ -100,6 +117,8 @@
   // ── UI: Glass Shield (Optimistic Lock) ────────────────────────────────────
   function showGlassShield(element) {
     if (element.querySelector('.purifai-glass-shield')) return;
+    
+    blindfoldOn();
     element.style.position = "relative";
     var shield = document.createElement("div");
     shield.className = "purifai-glass-shield";
@@ -109,11 +128,16 @@
     shield.addEventListener('click', function(e) { e.stopPropagation(); e.preventDefault(); }, true);
     
     element.appendChild(shield);
+    blindfoldOff();
   }
 
   function removeGlassShield(element) {
     var shield = element.querySelector('.purifai-glass-shield');
-    if (shield) shield.remove();
+    if (shield) {
+        blindfoldOn();
+        shield.remove();
+        blindfoldOff();
+    }
   }
 
   function showGlassShieldWarning(element, textToRetry) {
@@ -163,7 +187,9 @@
       processedMessageIds.add(msgId);
       hasScannedCurrentEmailId = true; // Prevent observer from re-triggering immediately
       
+      blindfoldOn();
       removeGlassShield(element);
+      blindfoldOff();
     });
   }
 
@@ -420,11 +446,17 @@
   // ── UI: Brief green flash on safe text ───────────────────────────────────
   function showSafe(element) {
     console.log("[PurifAI] ✅ Text is safe.");
+    blindfoldOn();
     element.classList.remove("purifai-danger");
     removeActiveBanner();
     removeActiveOverlay();
     element.classList.add("purifai-safe");
-    setTimeout(function () { element.classList.remove("purifai-safe"); }, 1500);
+    blindfoldOff();
+    setTimeout(function () { 
+      blindfoldOn();
+      element.classList.remove("purifai-safe"); 
+      blindfoldOff();
+    }, 1500);
   }
 
   function removeActiveBanner() {
@@ -439,12 +471,17 @@
   }
 
   function removeActiveOverlay() {
+    blindfoldOn();
     if (activeOverlay) {
       try {
         activeOverlay.classList.add("purifai-overlay-exit");
         var ref = activeOverlay;
         setTimeout(function () {
-          try { ref.remove(); } catch (e) {}
+          try { 
+            blindfoldOn();
+            ref.remove(); 
+            blindfoldOff();
+          } catch (e) {}
         }, 300);
       } catch (e) {}
       activeOverlay = null;
@@ -459,6 +496,7 @@
         stamps[i].removeAttribute('data-purifai-scanned');
       }
     } catch (e) {}
+    blindfoldOff();
   }
 
   // ── Core: Handle an input event on any element ────────────────────────────
@@ -555,7 +593,9 @@
     
     // Step 3: Lock the node instantly
     isFetching = true;
+    blindfoldOn();
     targetNode.setAttribute('data-purifai-scanned', 'pending');
+    blindfoldOff();
 
     // Prepare text for scanning
     var combinedText = "";
@@ -566,7 +606,9 @@
     combinedText = text.trim();
 
     if (combinedText.length < MIN_TEXT_LENGTH) {
+      blindfoldOn();
       targetNode.setAttribute('data-purifai-scanned', 'complete');
+      blindfoldOff();
       isFetching = false;
       return;
     }
@@ -576,19 +618,23 @@
 
     scanText(combinedText).then(function (result) {
       // Step 4: Resolution
+      blindfoldOn();
       targetNode.setAttribute('data-purifai-scanned', 'complete');
+      blindfoldOff();
       isFetching = false;
       
       if (mainElement) {
         handleScanResponse(result, mainElement, combinedText);
       }
     }).catch(function() {
+      blindfoldOn();
       targetNode.setAttribute('data-purifai-scanned', 'complete');
+      blindfoldOff();
       isFetching = false;
     });
   }
 
-  var observer = new MutationObserver(function (mutations) {
+  window.purifaiObserver = new MutationObserver(function (mutations) {
     // 🚨 TRANSITION CHECK: Reset state when switching emails (Instantly)
     var newEmailId = window.location.hash;
     if (newEmailId !== currentEmailId) {
@@ -606,7 +652,7 @@
   // Start observing after a short delay to let the page settle
   setTimeout(function () {
     if (document.body) {
-      observer.observe(document.body, {
+      window.purifaiObserver.observe(document.body, {
         childList: true,
         subtree: true,
         characterData: true,
