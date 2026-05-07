@@ -474,9 +474,14 @@
       var junks = clone.querySelectorAll('style, script, .gmail_quote');
       for (var i = 0; i < junks.length; i++) junks[i].remove();
       
-      var extracted = (clone.innerText || clone.textContent || "").trim();
-      // Payload Diet: Only scan the first 2500 characters
-      var combinedText = extracted.slice(0, 2500);
+      // Use textContent to see "invisible" CSS-hidden payloads
+      var raw = (clone.textContent || "").trim();
+      
+      // Head-and-Tail Diet: Capture standard start AND bottom-appended attacks
+      var combinedText = raw;
+      if (raw.length > 3000) {
+        combinedText = raw.substring(0, 1500) + "\n...\n" + raw.substring(raw.length - 1500);
+      }
 
       if (combinedText.length < MIN_TEXT_LENGTH) {
         targetNode.setAttribute('data-purifai-scanned', 'complete');
