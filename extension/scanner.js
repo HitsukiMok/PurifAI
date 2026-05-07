@@ -128,26 +128,36 @@
       <div style="font-size:24px">⚠️</div>
       <div>Scan unavailable (Server Busy). Proceed with caution.</div>
       <div class="purifai-glass-btn-group">
-        <button class="purifai-glass-btn purifai-glass-btn-retry">Retry Scan</button>
-        <button class="purifai-glass-btn purifai-glass-btn-proceed">Read Anyway</button>
+        <button id="retry-scan-btn" class="purifai-glass-btn purifai-glass-btn-retry">Retry Scan</button>
+        <button id="read-anyway-btn" class="purifai-glass-btn purifai-glass-btn-proceed">Read Anyway</button>
       </div>
     `;
 
-    var retryBtn = shield.querySelector('.purifai-glass-btn-retry');
-    var proceedBtn = shield.querySelector('.purifai-glass-btn-proceed');
+    var retryBtn = shield.querySelector('#retry-scan-btn');
+    var proceedBtn = shield.querySelector('#read-anyway-btn');
 
     retryBtn.addEventListener('click', function(e) {
       e.stopPropagation(); e.preventDefault();
+      
+      // Bypass the lock
+      isCurrentlyScanning = true;
+      
       shield.classList.remove('purifai-glass-shield-warning');
       shield.innerHTML = '<div class="purifai-glass-spinner"></div><div>PurifAI: Scanning...</div>';
       
       scanText(textToRetry).then(function(result) {
+         isCurrentlyScanning = false;
          handleScanResponse(result, element, textToRetry);
       });
     });
 
     proceedBtn.addEventListener('click', function(e) {
       e.stopPropagation(); e.preventDefault();
+      
+      // Permanently dissolve Glass Shield for this thread
+      var msgId = getMessageId(element) || currentEmailId;
+      processedMessageIds.add(msgId);
+      
       removeGlassShield(element);
     });
   }
@@ -517,28 +527,64 @@
   let hasTriggeredDanger = false;
   let isCurrentlyScanning = false;
   let apiDebounceTimer = null;
+  let hasScannedCurrentEmailId = false;
+
+  function doScan(emailContainers) {
+    var combinedText = "";
+    var mainElement = null;
+
+    emailContainers.forEach(function (container) {
+      var text = container.innerText || "";
+      if (text.trim()) {
+          combinedText += text.trim() + "\n";
+          if (container.classList.contains('a3s')) {
+              mainElement = container.closest('.gs') || container;
+          } else if (!mainElement) {
+              mainElement = container;
+          }
+      }
+    });
+
+    var trimmed = combinedText.trim();
+    if (trimmed.length < MIN_TEXT_LENGTH || trimmed === lastScannedText) {
+      isCurrentlyScanning = false;
+      return;
+    }
+
+    var msgId = mainElement ? getMessageId(mainElement) : currentEmailId;
+    if (processedMessageIds.has(msgId)) {
+      isCurrentlyScanning = false;
+      return;
+    }
+
+    lastScannedText = trimmed;
+    if (mainElement) showGlassShield(mainElement);
+
+    scanText(trimmed).then(function (result) {
+      isCurrentlyScanning = false;
+      if (mainElement) {
+          handleScanResponse(result, mainElement, trimmed);
+      }
+    });
+  }
 
   var observer = new MutationObserver(function (mutations) {
-    // ── The Circuit Breaker: Short-Circuit Logic ──
     var newEmailId = window.location.hash;
     if (newEmailId !== currentEmailId) {
       currentEmailId = newEmailId;
       hasTriggeredDanger = false;
+      hasScannedCurrentEmailId = false;
       removeActiveOverlay();
     }
 
     if (hasTriggeredDanger) {
-      return; // Do absolutely nothing if danger already triggered for this thread
+      return;
     }
     
-    // Clear the timeout: Every time the MutationObserver fires
-    clearTimeout(apiDebounceTimer);
-
     var foundRelevantChange = false;
     for (var i = 0; i < mutations.length; i++) {
       var m = mutations[i];
       
-      // ── UI Blindspot: Ignore our own UI wrappers ──
       var target = m.target;
       if (target.nodeType === Node.ELEMENT_NODE) {
           if (target.className && typeof target.className === 'string' && target.className.includes('purifai-')) continue;
@@ -564,53 +610,23 @@
     }
 
     if (foundRelevantChange) {
-      // Implement a strict 250ms Debounce Timer
-      apiDebounceTimer = setTimeout(function () {
-        // Preserve the Lock: set to true exactly when timer executes
-        if (isCurrentlyScanning) return;
+      var emailContainers = document.querySelectorAll('.a3s.aiL, h2.hP');
+
+      if (!hasScannedCurrentEmailId) {
+        // Zero-Latency First Scan: Fire instantly, completely bypass debounce
+        hasScannedCurrentEmailId = true;
         isCurrentlyScanning = true;
-
-        var emailContainers = document.querySelectorAll('.a3s.aiL, h2.hP');
-        var combinedText = "";
-        var mainElement = null;
-
-        emailContainers.forEach(function (container) {
-          // Precision DOM Targeting: Use innerText to ignore hidden scripts (<script>, <style>)
-          var text = container.innerText || "";
-          if (text.trim()) {
-              combinedText += text.trim() + "\n";
-              
-              // Retargeting: Prioritize the email body wrapper (.gs) instead of the subject header
-              if (container.classList.contains('a3s')) {
-                  mainElement = container.closest('.gs') || container;
-              } else if (!mainElement) {
-                  mainElement = container;
-              }
-          }
-        });
-
-        var trimmed = combinedText.trim();
-        if (trimmed.length < MIN_TEXT_LENGTH || trimmed === lastScannedText) {
-          isCurrentlyScanning = false;
-          return;
-        }
-
-        var msgId = mainElement ? getMessageId(mainElement) : currentEmailId;
-        if (processedMessageIds.has(msgId)) {
-          isCurrentlyScanning = false;
-          return;
-        }
-
-        lastScannedText = trimmed;
-        if (mainElement) showGlassShield(mainElement);
-
-        scanText(trimmed).then(function (result) {
-          isCurrentlyScanning = false;
-          if (mainElement) {
-              handleScanResponse(result, mainElement, trimmed);
-          }
-        });
-      }, 250);
+        clearTimeout(apiDebounceTimer);
+        doScan(emailContainers);
+      } else {
+        // Strict Debounce for subsequent DOM changes
+        clearTimeout(apiDebounceTimer);
+        apiDebounceTimer = setTimeout(function () {
+          if (isCurrentlyScanning) return;
+          isCurrentlyScanning = true;
+          doScan(emailContainers);
+        }, 250);
+      }
     }
   });
 
