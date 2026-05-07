@@ -1,17 +1,17 @@
-# PurifAI Backend — Python Dependencies
+# PurifAI Backend — Serverless Dependencies
 
 # Core API
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
 pydantic>=2.0
 
-# AI / ML — DeBERTa prompt injection classifier
-transformers>=4.45.0
-torch>=2.0.0
+# API Clients
+requests>=2.31.0
+supabase>=2.0.0
 
 # PDF / File scanning
 pypdf>=4.0.0
 python-multipart>=0.0.9
 
-# Utilities (already in stdlib but listed for clarity)
-# csv, os, datetime, collections, uuid — stdlib
+# Utilities
+# hashlib, os, datetime, uuid — stdlib

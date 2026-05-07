@@ -1,0 +1,32 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/scan",
+      "destination": "/backend/api/scan.py"
+    },
+    {
+      "source": "/api/scan-file",
+      "destination": "/backend/api/scan-file.py"
+    },
+    {
+      "source": "/api/traffic",
+      "destination": "/backend/api/traffic.py"
+    },
+    {
+      "source": "/api/metrics",
+      "destination": "/backend/api/metrics.py"
+    },
+    {
+      "source": "/api/feedback",
+      "destination": "/backend/api/feedback.py"
+    },
+    {
+      "source": "/api/feedback/stats",
+      "destination": "/backend/api/feedback_stats.py"
+    },
+    {
+      "source": "/api",
+      "destination": "/backend/api/index.py"
+    }
+  ]
+}
