@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Bot, Shield, AlertTriangle, Clock, MoreHorizontal,
   Search, Filter, Activity, Plus, X, Check, Pencil, Trash2, Flag,
 } from "lucide-react";
 import { FeedbackActionRow } from "@/components/ui/FeedbackWidget";
+import { useExtensionData } from "@/contexts/ExtensionContext";
 
 export const Route = createFileRoute("/agents")({
   head: () => ({
@@ -37,16 +38,8 @@ const POLICIES = ["Strict-Finance", "Standard-CX", "Strict-HR", "Permissive-Rese
 const TYPES = ["Financial Automation", "Customer Support", "HR Automation", "Web Research", "Email Processing", "Sales Automation", "Document Analysis", "Integration"];
 const WORKSPACES = ["Finance Ops", "CX Platform", "People Ops", "Strategy", "Executive", "Revenue", "Legal", "Engineering"];
 
-const SEED: Agent[] = [
-  { id: "ag-001", name: "FinanceBot v2", type: "Financial Automation", workspace: "Finance Ops", status: "Active", risk: "Low", scanned: 12847, blocked: 23, policy: "Strict-Finance", lastSeen: "2s ago", version: "2.4.1" },
-  { id: "ag-002", name: "SupportAgent v4", type: "Customer Support", workspace: "CX Platform", status: "Active", risk: "Medium", scanned: 9312, blocked: 41, policy: "Standard-CX", lastSeen: "8s ago", version: "4.1.0" },
-  { id: "ag-003", name: "HR-Copilot", type: "HR Automation", workspace: "People Ops", status: "Active", risk: "Low", scanned: 4201, blocked: 7, policy: "Strict-HR", lastSeen: "14s ago", version: "1.9.3" },
-  { id: "ag-004", name: "ResearchScout", type: "Web Research", workspace: "Strategy", status: "Idle", risk: "High", scanned: 7654, blocked: 89, policy: "Permissive-Research", lastSeen: "3m ago", version: "3.0.0" },
-  { id: "ag-005", name: "InboxTriage", type: "Email Processing", workspace: "Executive", status: "Active", risk: "Medium", scanned: 18003, blocked: 56, policy: "Standard-Email", lastSeen: "1s ago", version: "2.1.4" },
-  { id: "ag-006", name: "DealDeskAI", type: "Sales Automation", workspace: "Revenue", status: "Active", risk: "Low", scanned: 3987, blocked: 11, policy: "Strict-Finance", lastSeen: "22s ago", version: "1.5.2" },
-  { id: "ag-007", name: "DocuParser Pro", type: "Document Analysis", workspace: "Legal", status: "Suspended", risk: "High", scanned: 2341, blocked: 134, policy: "Lockdown", lastSeen: "2h ago", version: "1.2.0" },
-  { id: "ag-008", name: "DataSync Agent", type: "Integration", workspace: "Engineering", status: "Idle", risk: "Low", scanned: 521, blocked: 2, policy: "Standard-Eng", lastSeen: "18m ago", version: "0.9.7" },
-];
+// SEED removed — agents are derived dynamically from recentLogs
+
 
 const statusStyle: Record<AgentStatus, string> = {
   Active: "bg-success/15 text-success border-success/30",
@@ -175,52 +168,108 @@ function AgentMenu({ agent, onEdit, onDelete, onStatusChange, onClose, onReportA
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 function AgentsPage() {
-  const [agents, setAgents] = useState<Agent[]>(SEED);
+  const [manualAgents, setManualAgents] = useState<Agent[]>([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<AgentStatus | "All">("All");
   const [modal, setModal] = useState<{ open: boolean; agent: Agent | null }>({ open: false, agent: null });
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  // Track which agent row should open FeedbackWidget modal via menu
   const [feedbackTarget, setFeedbackTarget] = useState<Agent | null>(null);
+
+  const { state: extState } = useExtensionData();
+  const recentLogs = extState.recentLogs || [];
+
+  // Dynamically derive agents from unique targetAgent names in recentLogs
+  const derivedAgents = useMemo<Agent[]>(() => {
+    const agentMap = new Map<string, Agent>();
+    for (const log of recentLogs) {
+      const name = log.targetAgent || "Unknown Agent";
+      if (!agentMap.has(name)) {
+        agentMap.set(name, {
+          id: `ag-${name.replace(/\s+/g, "-").toLowerCase()}`,
+          name,
+          type: "Email Processing",
+          workspace: "General",
+          status: "Active",
+          risk: "Low",
+          scanned: 0,
+          blocked: 0,
+          policy: "Standard-Email",
+          lastSeen: "just now",
+          version: "1.0.0",
+        });
+      }
+      const entry = agentMap.get(name)!;
+      entry.scanned += 1;
+      if (log.status === "Blocked") {
+        entry.blocked += 1;
+        entry.risk = entry.blocked > 5 ? "High" : entry.blocked > 2 ? "Medium" : "Low";
+      }
+      if (log.timestamp) {
+        entry.lastSeen = new Date(log.timestamp).toLocaleTimeString("en-GB", { hour12: false });
+      }
+    }
+    return Array.from(agentMap.values());
+  }, [recentLogs]);
+
+  // Merge derived agents with any manually added/edited ones
+  const baseAgents = useMemo<Agent[]>(() => {
+    const manualNames = new Set(manualAgents.map((a) => a.name));
+    const derived = derivedAgents.filter((a) => !manualNames.has(a.name));
+    return [...manualAgents, ...derived];
+  }, [derivedAgents, manualAgents]);
+
+  if (recentLogs.length === 0 && manualAgents.length === 0) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center p-8 text-center">
+        <div className="rounded-full bg-ai/10 p-4 ring-1 ring-ai/20">
+          <Bot className="h-10 w-10 text-ai" />
+        </div>
+        <h2 className="mt-6 text-xl font-bold tracking-tight text-foreground">Awaiting Telemetry</h2>
+        <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+          Start scanning emails to discover and monitor AI agents.
+        </p>
+      </div>
+    );
+  }
 
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 2800);
   }
 
-  const filtered = agents.filter((a) => {
-    const q = search.toLowerCase();
-    return (a.name.toLowerCase().includes(q) || a.workspace.toLowerCase().includes(q)) &&
+  const filtered = baseAgents.filter((a) => {
+    const q = (search || "").toLowerCase();
+    return ((a.name || "").toLowerCase().includes(q) || (a.workspace || "").toLowerCase().includes(q)) &&
       (filter === "All" || a.status === filter);
   });
 
   function saveAgent(form: Omit<Agent, "id" | "scanned" | "blocked" | "lastSeen">) {
     if (modal.agent) {
-      setAgents((prev) => prev.map((a) => a.id === modal.agent!.id ? { ...a, ...form } : a));
+      setManualAgents((prev) => prev.map((a) => a.id === modal.agent!.id ? { ...a, ...form } : a));
       showToast(`"${form.name}" updated.`);
     } else {
       const newAgent: Agent = { ...form, id: `ag-${Date.now()}`, scanned: 0, blocked: 0, lastSeen: "just now" };
-      setAgents((prev) => [newAgent, ...prev]);
+      setManualAgents((prev) => [newAgent, ...prev]);
       showToast(`"${form.name}" registered.`);
     }
     setModal({ open: false, agent: null });
   }
 
   function deleteAgent(id: string) {
-    const name = agents.find((a) => a.id === id)?.name;
-    setAgents((prev) => prev.filter((a) => a.id !== id));
+    const name = baseAgents.find((a) => a.id === id)?.name;
+    setManualAgents((prev) => prev.filter((a) => a.id !== id));
     showToast(`"${name}" removed.`);
   }
 
   function changeStatus(id: string, status: AgentStatus) {
-    setAgents((prev) => prev.map((a) => a.id === id ? { ...a, status } : a));
+    setManualAgents((prev) => prev.map((a) => a.id === id ? { ...a, status } : a));
     showToast(`Status updated to ${status}.`);
   }
 
-  const totScanned = agents.reduce((s, a) => s + a.scanned, 0);
-  const totBlocked = agents.reduce((s, a) => s + a.blocked, 0);
-  const active = agents.filter((a) => a.status === "Active").length;
+  const totScanned = extState.totalScans || 0;
+  const totBlocked = extState.threatsBlocked || 0;
+  const active = baseAgents.filter((a) => a.status === "Active").length;
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-6 p-4 md:p-6" onClick={() => setOpenMenu(null)}>
@@ -254,7 +303,7 @@ function AgentsPage() {
       {/* Summary */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { label: "Total Agents", value: agents.length, cls: "text-ai ring-ai/25" },
+          { label: "Total Agents", value: baseAgents.length, cls: "text-ai ring-ai/25" },
           { label: "Active Now", value: active, cls: "text-success ring-success/25" },
           { label: "Total Scanned", value: totScanned.toLocaleString(), cls: "text-ai ring-ai/25" },
           { label: "Total Blocked", value: totBlocked, cls: "text-danger ring-danger/25" },
@@ -371,7 +420,7 @@ function AgentsPage() {
         </div>
         {filtered.length === 0 && (
           <div className="py-12 text-center text-sm text-muted-foreground">
-            {agents.length === 0 ? 'No agents registered yet. Click "Add Agent" to get started.' : "No agents match your search."}
+            {baseAgents.length === 0 ? 'No agents registered yet. Click "Add Agent" to get started.' : "No agents match your search."}
           </div>
         )}
       </div>

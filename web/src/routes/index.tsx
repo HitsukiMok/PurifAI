@@ -5,14 +5,8 @@ import { MetricCard } from "@/components/dashboard/MetricCard";
 import { LiveTrafficTable } from "@/components/dashboard/LiveTrafficTable";
 import { AttackInspectionPanel } from "@/components/dashboard/AttackInspectionPanel";
 import { ExtensionSection } from "@/components/dashboard/ExtensionSection";
-import { useExtensionBridge } from "@/hooks/use-extension-bridge";
-import {
-  initialAttack,
-  initialRows,
-  makeAttackRow,
-  makeCleanRow,
-  type TrafficRow,
-} from "@/lib/mock-traffic";
+import type { RichLogEntry } from "@/lib/mock-traffic";
+import { useExtensionData } from "@/contexts/ExtensionContext";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,40 +23,45 @@ export const Route = createFileRoute("/")({
 });
 
 function Dashboard() {
-  const [rows, setRows] = useState<TrafficRow[]>([initialAttack, ...initialRows]);
-  const [scanned, setScanned] = useState(48217);
-  const [blocked, setBlocked] = useState(127);
-  const [agents] = useState(34);
-  const [selected, setSelected] = useState<TrafficRow>(initialAttack);
-  const [newestId, setNewestId] = useState<string | undefined>(initialAttack.id);
+  const { state: extState, connected: extensionConnected } = useExtensionData();
+  const rows = extState.recentLogs || [];
+  const scanned = extState.totalScans || 0;
+  const blocked = extState.threatsBlocked || 0;
+  
+  // Aggregate agents
+  const agentsSet = new Set(rows.map(r => r.targetAgent).filter(Boolean));
+  const agents = agentsSet.size > 0 ? agentsSet.size : 1;
+
+  const [selected, setSelected] = useState<RichLogEntry | null>(null);
+  const newestId = rows.length > 0 ? rows[0].id : undefined;
+  
   const [blockedPulse, setBlockedPulse] = useState(0);
   const [showPanel, setShowPanel] = useState(false);
 
-  // ── Extension bridge — broadcasts live data to the Chrome extension ──
-  const { extensionConnected } = useExtensionBridge((state) => {
-    if (state.totalScans !== undefined) setScanned(state.totalScans);
-    if (state.threatsBlocked !== undefined) setBlocked(state.threatsBlocked);
-    // agents doesn't need to change but we can sync it
-    if (state.recentLogs) {
-      setRows(state.recentLogs);
-      if (state.recentLogs.length > 0) {
-        setNewestId(state.recentLogs[0].id);
+  // Pulse effect when blocked count increases
+  const prevBlockedRef = useRef(blocked);
+  useEffect(() => {
+    if (blocked > prevBlockedRef.current) {
+      setBlockedPulse(p => p + 1);
+      // Auto-select latest blocked event
+      const latestBlocked = rows.find(r => r.status === "Blocked");
+      if (latestBlocked && (!selected || latestBlocked.id !== selected.id)) {
+        setSelected(latestBlocked);
+        setShowPanel(true);
       }
     }
-  });
+    prevBlockedRef.current = blocked;
+  }, [blocked, rows, selected]);
 
   function simulateAttack() {
-    const a = makeAttackRow();
-    setRows((prev) => [a, ...prev].slice(0, 40));
-    setBlocked((b) => b + 1);
-    setScanned((s) => s + 1);
-    setSelected(a);
-    setNewestId(a.id);
-    setBlockedPulse((p) => p + 1);
-    setShowPanel(true);
+    // Attack simulation handled by extension, or just UI demo
+    // We'll leave it as a mock local update, or remove it. 
+    // Since we rely on global state, simulation should happen there if needed, 
+    // but user says "One-click attack simulation (demo)" so maybe we just show an alert
+    alert("To simulate an attack, use the extension popup 'Simulate Attack' button.");
   }
 
-  function handleSelect(r: TrafficRow) {
+  function handleSelect(r: RichLogEntry) {
     if (r.status === "Blocked") {
       setSelected(r);
       setShowPanel(true);
@@ -128,7 +127,7 @@ function Dashboard() {
               rows={rows}
               newestId={newestId}
               onSelect={handleSelect}
-              selectedId={selected.id}
+              selectedId={selected?.id}
             />
           </div>
 
@@ -137,7 +136,7 @@ function Dashboard() {
             className={`lg:col-span-2 min-h-[400px] sm:min-h-[480px] lg:min-h-[520px] ${showPanel ? "block" : "hidden lg:block"
               }`}
           >
-            <AttackInspectionPanel attack={selected} />
+            {selected && <AttackInspectionPanel attack={selected} />}
           </div>
 
           {/* Mobile: show a prompt when panel is hidden */}

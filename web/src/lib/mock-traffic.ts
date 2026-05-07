@@ -1,4 +1,16 @@
-export type Status = "Clean" | "Blocked";
+export type Status = "Clean" | "Blocked" | "Flagged";
+
+export interface RichLogEntry {
+  id: string;
+  timestamp: string;
+  source: string;
+  rawText: string;
+  sanitizedText: string;
+  threatType: string;
+  status: Status;
+  targetAgent: string;
+  risk?: number;
+}
 
 export type TrafficRow = {
   id: string;

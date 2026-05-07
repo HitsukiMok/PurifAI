@@ -36,7 +36,7 @@
               resolve(response || { error: true });
               return;
             }
-            console.log("[PurifAI] Scan result:", response.data);
+            // Scan result received
             resolve(response.data);
           }
         );
@@ -196,7 +196,7 @@
 
   // ── UI: Show blocking overlay (full-screen confirmation popup) ────────────
   function showBlockingOverlay(element, data) {
-    console.log("[PurifAI] 🚨 INJECTION BLOCKED! Confidence:", data.confidence);
+    // INJECTION BLOCKED
 
     // Don't re-block if user already acknowledged this text
     if (acknowledgedTexts.has(data.text)) {
@@ -360,7 +360,7 @@
 
   // ── UI: Show floating toast warning (for acknowledged / lower-risk) ───────
   function showWarningBanner(element, data) {
-    console.log("[PurifAI] ⚠️ Showing warning banner. Confidence:", data.confidence);
+    // Showing warning banner
     removeActiveBanner();
 
     var banner = document.createElement("div");
@@ -467,7 +467,7 @@
     }
     var trimmed = text.trim();
 
-    console.log("[PurifAI] handleInput called, text length:", trimmed.length);
+    // handleInput called
 
     if (trimmed.length < MIN_TEXT_LENGTH) {
       element.classList.remove("purifai-danger");
@@ -489,7 +489,7 @@
 
     lastScannedText = trimmed;
 
-    console.log("[PurifAI] Scanning text:", trimmed.substring(0, 80) + "...");
+    // Scanning text
     
     showGlassShield(element);
 
@@ -665,7 +665,7 @@
     var blockData = event.data.data;
     if (!blockData) return;
 
-    console.log("[PurifAI] 🔒 Network-level interception received:", blockData.url);
+    // Network-level interception received
 
     // Build a scan result object compatible with showBlockingOverlay
     var fakeResult = {

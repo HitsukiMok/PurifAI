@@ -183,7 +183,7 @@ document.getElementById("form-signup").addEventListener("submit", (e) => {
 ["open-dashboard-signin", "open-dashboard-signup"].forEach((id) => {
   const el = document.getElementById(id);
   if (el) el.addEventListener("click", () => {
-    chrome.tabs.create({ url: "http://localhost:8080" });
+    chrome.tabs.create({ url: "http://localhost:5173" });
   });
 });
 
@@ -270,7 +270,7 @@ function renderConnection(state) {
 
 function updateDashboardUrl(state) {
   const btn = document.getElementById("open-dashboard-btn");
-  if (btn) btn.href = state.dashboardUrl || "http://localhost:8080";
+  if (btn) btn.href = state.dashboardUrl || "http://localhost:5173";
 }
 
 // ── Metrics ────────────────────────────────────────────────────────────────

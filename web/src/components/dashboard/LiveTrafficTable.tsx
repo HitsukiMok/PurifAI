@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { TrafficRow } from "@/lib/mock-traffic";
+import type { RichLogEntry } from "@/lib/mock-traffic";
 import { Activity } from "lucide-react";
 
 function riskColor(risk: number) {
@@ -20,9 +20,9 @@ export function LiveTrafficTable({
   onSelect,
   selectedId,
 }: {
-  rows: TrafficRow[];
+  rows: RichLogEntry[];
   newestId?: string;
-  onSelect: (row: TrafficRow) => void;
+  onSelect: (row: RichLogEntry) => void;
   selectedId?: string;
 }) {
   return (
@@ -64,25 +64,27 @@ export function LiveTrafficTable({
                   )}
                 >
                   <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground sm:px-5 sm:py-3 whitespace-nowrap">
-                    {r.time}
+                    {r.timestamp && !isNaN(new Date(r.timestamp).getTime())
+                      ? new Date(r.timestamp).toLocaleTimeString("en-GB", { hour12: false })
+                      : "Unknown Time"}
                   </td>
                   {/* Hide source on very small screens */}
                   <td className="hidden px-3 py-2.5 font-mono text-xs text-foreground/90 sm:table-cell sm:py-3">
-                    <span className="block max-w-[160px] truncate lg:max-w-[220px]">{r.source}</span>
+                    <span className="block max-w-[160px] truncate lg:max-w-[220px]">{r.source || "Unknown Source"}</span>
                   </td>
                   <td className="px-3 py-2.5 text-xs sm:py-3">
-                    <span className="text-ai truncate block max-w-[90px] sm:max-w-none">{r.agent}</span>
+                    <span className="text-ai truncate block max-w-[90px] sm:max-w-none">{r.targetAgent || "Unknown Agent"}</span>
                   </td>
                   <td className={cn("px-3 py-2.5 sm:py-3")}>
                     <div className="flex flex-col gap-1 min-w-[56px]">
-                      <span className={cn("font-mono text-xs font-semibold", riskColor(r.risk))}>
-                        {r.risk}%
+                      <span className={cn("font-mono text-xs font-semibold", riskColor(r.risk || 0))}>
+                        {r.risk || 0}%
                       </span>
                       {/* Mini progress bar */}
                       <div className="h-1 w-full overflow-hidden rounded-full bg-muted/60">
                         <div
-                          className={cn("h-full rounded-full transition-all duration-500", riskBarColor(r.risk))}
-                          style={{ width: `${r.risk}%` }}
+                          className={cn("h-full rounded-full transition-all duration-500", riskBarColor(r.risk || 0))}
+                          style={{ width: `${r.risk || 0}%` }}
                         />
                       </div>
                     </div>

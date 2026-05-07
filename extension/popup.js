@@ -558,7 +558,7 @@ if (scanBtn) {
     formData.append("file", selectedFile, selectedFile.name);
     
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/scan-file", {
+      const response = await fetch("http://localhost:8000/api/scan-file", {
         method: "POST",
         body: formData
       });

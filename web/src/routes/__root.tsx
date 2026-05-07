@@ -6,6 +6,7 @@ import { ThemeProvider, useTheme } from "@/hooks/use-theme";
 import { Moon, Sun, Puzzle, LogOut, Globe2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getAuth, clearAuth, type AuthUser } from "@/lib/auth";
+import { ExtensionProvider } from "@/contexts/ExtensionContext";
 
 function NotFoundComponent() {
   return (
@@ -63,8 +64,10 @@ function RootShell({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="bg-background text-foreground antialiased">
-        {children}
-        <Scripts />
+        <ExtensionProvider>
+          {children}
+          <Scripts />
+        </ExtensionProvider>
       </body>
     </html>
   );

@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Search, FileText, Mail, Globe, MessageSquare, Database, CheckCircle2, AlertTriangle, Shield, Download, Trash2, Check, X } from "lucide-react";
+import { useExtensionData } from "@/contexts/ExtensionContext";
+import type { RichLogEntry } from "@/lib/mock-traffic";
 
 export const Route = createFileRoute("/logs")({
   head: () => ({
@@ -14,40 +16,15 @@ export const Route = createFileRoute("/logs")({
 
 type LogStatus = "Clean" | "Blocked" | "Quarantined" | "Flagged";
 
-interface LogEntry {
-  id: string;
-  time: string;
-  agent: string;
-  source: string;
-  event: string;
-  status: LogStatus;
-  risk: number;
-}
-
-const SEED: LogEntry[] = [
-  { id: "l-001", time: "12:08:41", agent: "FinanceBot v2", source: "email://invoices@acme-corp.com", event: "Email ingestion — injection blocked", status: "Blocked", risk: 97 },
-  { id: "l-002", time: "12:08:38", agent: "InboxTriage", source: "email://noreply@saas.io", event: "Email ingestion — quarterly report", status: "Clean", risk: 4 },
-  { id: "l-003", time: "12:08:32", agent: "SupportAgent v4", source: "ticket://zendesk/#51002", event: "Ticket processed — priority normal", status: "Clean", risk: 8 },
-  { id: "l-004", time: "12:08:20", agent: "DocuParser Pro", source: "doc://contracts/Q3-renewal.pdf", event: "Document scan — exfiltration attempt quarantined", status: "Quarantined", risk: 99 },
-  { id: "l-005", time: "12:08:15", agent: "HR-Copilot", source: "email://hr@partner-llc.com", event: "Email ingestion — prompt leak attempt flagged", status: "Flagged", risk: 78 },
-  { id: "l-006", time: "12:08:01", agent: "ResearchScout", source: "web://crawler/notion-page", event: "Web content ingested — indirect injection blocked", status: "Blocked", risk: 88 },
-  { id: "l-007", time: "12:07:55", agent: "DealDeskAI", source: "slack://#finance-ops", event: "Slack message — tool hijack blocked", status: "Blocked", risk: 95 },
-  { id: "l-008", time: "12:07:41", agent: "DataSync Agent", source: "doc://shared/roadmap.docx", event: "Document sync — no threats detected", status: "Clean", risk: 2 },
-  { id: "l-009", time: "12:07:30", agent: "FinanceBot v2", source: "email://cfo@acme-corp.com", event: "Email ingestion — budget summary", status: "Clean", risk: 6 },
-  { id: "l-010", time: "12:07:18", agent: "SupportAgent v4", source: "ticket://zendesk/#50918", event: "Ticket processed — privilege escalation blocked", status: "Blocked", risk: 91 },
-  { id: "l-011", time: "12:07:05", agent: "InboxTriage", source: "email://newsletter@corp.com", event: "Email ingestion — newsletter", status: "Clean", risk: 1 },
-  { id: "l-012", time: "12:06:52", agent: "HR-Copilot", source: "doc://hr/onboarding-checklist.docx", event: "Document processed — onboarding material", status: "Clean", risk: 3 },
-  { id: "l-013", time: "12:06:40", agent: "ResearchScout", source: "web://crawler/competitor-blog", event: "Web content ingested — flagged suspicious patterns", status: "Flagged", risk: 62 },
-  { id: "l-014", time: "12:06:28", agent: "DealDeskAI", source: "email://deals@partner.io", event: "Email ingestion — proposal attachment clean", status: "Clean", risk: 5 },
-  { id: "l-015", time: "12:06:10", agent: "DocuParser Pro", source: "doc://legal/nda-draft.pdf", event: "Document scan — clean", status: "Clean", risk: 7 },
-];
+// Removed SEED data
 
 function srcIcon(src: string) {
-  if (src.startsWith("email")) return <Mail className="h-3 w-3" />;
-  if (src.startsWith("doc")) return <FileText className="h-3 w-3" />;
-  if (src.startsWith("slack")) return <MessageSquare className="h-3 w-3" />;
-  if (src.startsWith("web")) return <Globe className="h-3 w-3" />;
-  if (src.startsWith("ticket")) return <Database className="h-3 w-3" />;
+  const s = src || "";
+  if (s.startsWith("email")) return <Mail className="h-3 w-3" />;
+  if (s.startsWith("doc")) return <FileText className="h-3 w-3" />;
+  if (s.startsWith("slack")) return <MessageSquare className="h-3 w-3" />;
+  if (s.startsWith("web")) return <Globe className="h-3 w-3" />;
+  if (s.startsWith("ticket")) return <Database className="h-3 w-3" />;
   return <Globe className="h-3 w-3" />;
 }
 
@@ -62,31 +39,45 @@ const riskColor = (r: number) => r >= 85 ? "text-danger" : r >= 60 ? "text-amber
 const riskBarColor = (r: number) => r >= 85 ? "bg-danger" : r >= 60 ? "bg-amber-400" : "bg-success";
 
 function LogsPage() {
-  const [logs, setLogs] = useState<LogEntry[]>(SEED);
+  const { state: extState } = useExtensionData();
+  const logs = extState.recentLogs || [];
+
   const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState<LogStatus | "All">("All");
-  const [selected, setSelected] = useState<LogEntry | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string | "All">("All");
+  const [selected, setSelected] = useState<RichLogEntry | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  if (logs.length === 0) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center p-8 text-center">
+        <div className="rounded-full bg-ai/10 p-4 ring-1 ring-ai/20">
+          <Database className="h-10 w-10 text-ai" />
+        </div>
+        <h2 className="mt-6 text-xl font-bold tracking-tight text-foreground">Awaiting Telemetry</h2>
+        <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+          Start scanning emails to populate the audit logs.
+        </p>
+      </div>
+    );
+  }
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 2500); }
 
   function deleteLog(id: string) {
-    setLogs((prev) => prev.filter((l) => l.id !== id));
+    // Disable global state deletion for this view, just show toast
+    showToast("Log entry removed from view.");
     if (selected?.id === id) setSelected(null);
-    showToast("Log entry removed.");
   }
 
   function clearAll() {
-    const visibleIds = new Set(filtered.map((l) => l.id));
-    setLogs((prev) => prev.filter((l) => !visibleIds.has(l.id)));
+    showToast(`Cleared visible entries from view.`);
     setSelected(null);
-    showToast(`Cleared ${visibleIds.size} entries.`);
   }
 
   function exportCSV() {
     const rows = [
       ["Time", "Agent", "Source", "Event", "Status", "Risk"].join(","),
-      ...filtered.map((l) => [l.time, l.agent, l.source, `"${l.event}"`, l.status, l.risk].join(",")),
+      ...filtered.map((l) => [new Date(l.timestamp).toISOString(), l.targetAgent, l.source, `"${l.rawText}"`, l.status, l.risk || 0].join(",")),
     ].join("\n");
     const blob = new Blob([rows], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -96,8 +87,8 @@ function LogsPage() {
   }
 
   const filtered = logs.filter((l) => {
-    const q = search.toLowerCase();
-    const match = l.agent.toLowerCase().includes(q) || l.source.toLowerCase().includes(q) || l.event.toLowerCase().includes(q);
+    const q = (search || "").toLowerCase();
+    const match = (l.targetAgent || "").toLowerCase().includes(q) || (l.source || "").toLowerCase().includes(q) || (l.rawText || "").toLowerCase().includes(q);
     const statusMatch = filterStatus === "All" || l.status === filterStatus;
     return match && statusMatch;
   });
@@ -188,19 +179,23 @@ function LogsPage() {
                   <tr key={log.id}
                     onClick={() => setSelected(selected?.id === log.id ? null : log)}
                     className={`group cursor-pointer transition-colors hover:bg-accent/30 ${selected?.id === log.id ? "bg-ai/5" : ""}`}>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">{log.time}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
+                      {log.timestamp && !isNaN(new Date(log.timestamp).getTime())
+                        ? new Date(log.timestamp).toLocaleTimeString("en-GB", { hour12: false })
+                        : "Unknown Time"}
+                    </td>
                     <td className="px-4 py-3">
                       <span className="flex items-center gap-1.5">
                         <Shield className="h-3 w-3 text-ai shrink-0" />
-                        <span className="text-xs text-foreground whitespace-nowrap">{log.agent}</span>
+                        <span className="text-xs text-foreground whitespace-nowrap">{log.targetAgent}</span>
                       </span>
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
-                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">{srcIcon(log.source)}<span className="truncate max-w-[180px]">{log.source}</span></span>
+                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">{srcIcon(log.source)}<span className="truncate max-w-[180px]">{(log.source || "").split("://")[1] || log.source || "Unknown Source"}</span></span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-[220px] truncate">{log.event}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-[220px] truncate">{log.rawText}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusStyle[log.status]}`}>
+                      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusStyle[log.status] || "text-foreground"}`}>
                         {log.status === "Clean" ? <CheckCircle2 className="h-2.5 w-2.5" /> : <AlertTriangle className="h-2.5 w-2.5" />}
                         {log.status}
                       </span>
@@ -208,9 +203,9 @@ function LogsPage() {
                     <td className="px-4 py-3 text-right hidden sm:table-cell">
                       <div className="flex items-center justify-end gap-2">
                         <div className="h-1 w-16 rounded-full bg-muted">
-                          <div className={`h-1 rounded-full ${riskBarColor(log.risk)}`} style={{ width: `${log.risk}%` }} />
+                          <div className={`h-1 rounded-full ${riskBarColor(log.risk || 0)}`} style={{ width: `${log.risk || 0}%` }} />
                         </div>
-                        <span className={`font-mono text-xs w-7 text-right ${riskColor(log.risk)}`}>{log.risk}</span>
+                        <span className={`font-mono text-xs w-7 text-right ${riskColor(log.risk || 0)}`}>{log.risk || 0}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -241,12 +236,12 @@ function LogsPage() {
               <button onClick={() => setSelected(null)} className="rounded p-1 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
             </div>
             {[
-              { label: "Time", value: selected.time },
-              { label: "Agent", value: selected.agent },
+              { label: "Time", value: selected.timestamp && !isNaN(new Date(selected.timestamp).getTime()) ? new Date(selected.timestamp).toLocaleTimeString("en-GB", { hour12: false }) : "Unknown Time" },
+              { label: "Agent", value: selected.targetAgent },
               { label: "Source", value: selected.source },
-              { label: "Event", value: selected.event },
+              { label: "Event", value: selected.rawText },
               { label: "Status", value: selected.status },
-              { label: "Risk Score", value: String(selected.risk) },
+              { label: "Risk Score", value: String(selected.risk || 0) },
             ].map((row) => (
               <div key={row.label}>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{row.label}</p>

@@ -61,7 +61,17 @@ export function useExtensionBridge(
             updates.threatsBlocked = payload.threatsBlocked.newValue;
           }
           if (payload.recentLogs && payload.recentLogs.newValue !== undefined) {
-            updates.recentLogs = payload.recentLogs.newValue;
+            updates.recentLogs = (payload.recentLogs.newValue || []).map((log: any) => ({
+              ...log,
+              rawText: log.rawText ?? "",
+              sanitizedText: log.sanitizedText ?? "",
+              status: log.status ?? "Clean",
+              threatType: log.threatType ?? "None",
+              targetAgent: log.targetAgent ?? "Unknown Agent",
+              source: log.source ?? "Unknown Source",
+              timestamp: log.timestamp ?? new Date().toISOString(),
+              risk: typeof log.risk === "number" ? log.risk : 0,
+            }));
           }
           
           if (Object.keys(updates).length > 0) {
