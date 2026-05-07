@@ -1,4 +1,5 @@
 import { useTheme } from "@/hooks/use-theme";
+import { useState } from "react";
 import {
   Puzzle,
   Zap,
@@ -63,7 +64,10 @@ export function ExtensionSection({ extensionConnected }: ExtensionSectionProps) 
 // ═════════════════════════════════════════════════════════════════════════
 function InstallCard({ extensionConnected }: { extensionConnected: boolean }) {
   const { theme } = useTheme();
+  const [showModal, setShowModal] = useState(false);
+
   return (
+    <>
     <div className="flex flex-col rounded-xl border bg-card lg:flex-row">
       {/* Card header (left on desktop) */}
       <div className="flex items-center gap-4 border-b px-5 py-5 lg:border-b-0 lg:border-r lg:flex-col lg:items-start lg:justify-between lg:w-64 lg:shrink-0">
@@ -159,7 +163,7 @@ function InstallCard({ extensionConnected }: { extensionConnected: boolean }) {
               <button
                 id="view-install-instructions-btn"
                 className="w-full rounded-lg border border-border/60 px-4 py-2 text-xs text-muted-foreground transition-colors hover:border-ai/40 hover:text-ai"
-                onClick={() => window.open("extension/icons/create-icons.html", "_blank")}
+                onClick={() => setShowModal(true)}
               >
                 View setup instructions →
               </button>
@@ -168,5 +172,56 @@ function InstallCard({ extensionConnected }: { extensionConnected: boolean }) {
         </div>
       </div>
     </div>
+
+    {/* Setup Instructions Modal */}
+    {showModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+        <div className="relative w-full max-w-md rounded-xl border bg-card p-6 shadow-2xl">
+          <button 
+            onClick={() => setShowModal(false)}
+            className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
+          >
+            <ShieldX className="h-5 w-5" />
+          </button>
+          
+          <div className="mb-5 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-ai/10 text-ai ring-1 ring-ai/30">
+              <Download className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold tracking-tight text-foreground">Manual Installation</h3>
+              <p className="text-xs text-muted-foreground">Follow these 4 simple steps to connect</p>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="flex gap-3">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">1</div>
+              <p className="text-sm text-muted-foreground pt-0.5"><strong className="text-foreground">Download</strong> the latest PurifAI release.</p>
+            </div>
+            <div className="flex gap-3">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">2</div>
+              <p className="text-sm text-muted-foreground pt-0.5">Go to <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">chrome://extensions/</code> and enable <strong className="text-foreground">Developer Mode</strong>.</p>
+            </div>
+            <div className="flex gap-3">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">3</div>
+              <p className="text-sm text-muted-foreground pt-0.5"><strong className="text-foreground">Drag and drop</strong> the .crx file (Packed Extension) or click "Load Unpacked" and select the PurifAI folder.</p>
+            </div>
+            <div className="flex gap-3">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">4</div>
+              <p className="text-sm text-muted-foreground pt-0.5"><strong className="text-foreground">Pin</strong> the extension to your toolbar and click to connect!</p>
+            </div>
+          </div>
+          
+          <button 
+            onClick={() => setShowModal(false)}
+            className="mt-6 w-full rounded-lg bg-ai px-4 py-2.5 text-sm font-semibold text-background hover:opacity-90"
+          >
+            Got it, thanks!
+          </button>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

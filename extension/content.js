@@ -99,6 +99,24 @@
         }, "*");
       });
     }
+
+    // ── ★ Dashboard state fetch ──
+    if (event.data.type === "PURIFAI_FETCH_REAL_STATE") {
+      try {
+        chrome.runtime.sendMessage({ type: "PURIFAI_FETCH_REAL_STATE" }, (state) => {
+          if (state) {
+            window.postMessage({ type: "PURIFAI_LIVE_UPDATE", state }, "*");
+          }
+        });
+      } catch (e) { /* ignore */ }
+    }
+  });
+
+  // ── Listen for real-time background state changes ────────────────────────
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes.purifaiState && changes.purifaiState.newValue) {
+      window.postMessage({ type: "PURIFAI_LIVE_UPDATE", state: changes.purifaiState.newValue }, "*");
+    }
   });
 
   // ── Announce on unload ────────────────────────────────────────────────────

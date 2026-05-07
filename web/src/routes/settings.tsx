@@ -251,9 +251,9 @@ function SettingsPage() {
                 { key: "daily" as const, label: "Daily Digest", desc: "Summary email every day at 08:00 workspace time" },
                 { key: "weekly" as const, label: "Weekly Report", desc: "Comprehensive weekly threat review on Mondays" },
               ].map((n) => (
-                <div key={n.key} className="flex items-center justify-between gap-4 rounded-lg border border-border/40 bg-muted/20 p-4">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{n.label}</p>
+                <div key={n.key} className="flex items-start justify-between gap-4 rounded-lg border border-border/40 bg-muted/20 p-4">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium text-foreground leading-5">{n.label}</p>
                     <p className="text-xs text-muted-foreground">{n.desc}</p>
                   </div>
                   <Toggle id={`notif-${n.key}`} checked={notifs[n.key]}
@@ -317,9 +317,9 @@ function SettingsPage() {
                   { id: "twofa", label: "Two-Factor Authentication", desc: "Required for all admin actions", checked: twofa, onChange: () => { setTwofa((v) => !v); showToast("2FA setting updated."); } },
                   { id: "sso", label: "SSO / SAML", desc: "Okta or Azure AD single sign-on", checked: sso, onChange: () => { setSso((v) => !v); showToast("SSO setting updated."); } },
                 ].map((item) => (
-                  <div key={item.id} className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/20 p-4">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{item.label}</p>
+                  <div key={item.id} className="flex items-start justify-between rounded-lg border border-border/40 bg-muted/20 p-4">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium text-foreground leading-5">{item.label}</p>
                       <p className="text-xs text-muted-foreground">{item.desc}</p>
                     </div>
                     <Toggle id={`${item.id}-toggle`} checked={item.checked} onChange={item.onChange} />

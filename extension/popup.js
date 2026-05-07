@@ -62,6 +62,7 @@ function connectToBackground() {
   }
 }
 connectToBackground();
+checkBackgroundStatus();
 
 // ── State update handler ────────────────────────────────────────────────────
 function handleStateUpdate(state) {
@@ -70,8 +71,8 @@ function handleStateUpdate(state) {
     showDashboardScreen();
     renderUserAvatar(state.user);
     renderConnection(state);
-    renderMetrics(state.metrics);
-    renderTrafficRows(state.rows || []);
+    renderMetrics({ scanned: state.totalScans, blocked: state.threatsBlocked, agents: state.agentsProtected });
+    renderTrafficRows(state.recentLogs || []);
     updateDashboardUrl(state);
   } else {
     showAuthScreen();
@@ -246,22 +247,49 @@ if (logoutBtn) {
 }
 
 // ── Connection status ──────────────────────────────────────────────────────
-function renderConnection(state) {
+function checkBackgroundStatus() {
   const badge   = document.getElementById("conn-badge");
   const label   = document.getElementById("conn-label");
+  if (!badge || !label) return;
+
+  label.textContent = "Checking...";
+  
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    badge.classList.remove("live"); badge.classList.add("offline");
+    label.textContent = "Disconnected";
+  }, 2000);
+
+  try {
+    chrome.runtime.sendMessage({ type: "PURIFAI_STATUS_CHECK" }, (response) => {
+      if (timedOut) return;
+      clearTimeout(timer);
+      if (chrome.runtime.lastError || !response || !response.ok) {
+        badge.classList.remove("live"); badge.classList.add("offline");
+        label.textContent = "Disconnected";
+      } else {
+        badge.classList.remove("offline"); badge.classList.add("live");
+        label.textContent = "Connected";
+      }
+    });
+  } catch (e) {
+    clearTimeout(timer);
+    badge.classList.remove("live"); badge.classList.add("offline");
+    label.textContent = "Disconnected";
+  }
+}
+
+function renderConnection(state) {
   const urlDot  = document.getElementById("url-dot");
   const urlText = document.getElementById("url-text");
-  if (!badge) return;
+  if (!urlDot) return;
 
   if (state.dashboardConnected) {
-    badge.classList.remove("offline"); badge.classList.add("live");
-    label.textContent = "Live";
     urlDot.style.background = "var(--green)";
     urlText.classList.remove("not-connected");
     urlText.textContent = state.dashboardUrl || "localhost — AgentShield Dashboard";
   } else {
-    badge.classList.remove("live"); badge.classList.add("offline");
-    label.textContent = "Offline";
     urlDot.style.background = "var(--amber)";
     urlText.classList.add("not-connected");
     urlText.textContent = "Not connected to AgentShield Dashboard";
@@ -308,13 +336,13 @@ function riskClass(risk) {
   return "low";
 }
 
-function renderTrafficRows(rows) {
+function renderTrafficRows(recentLogs) {
   const tbody = document.getElementById("traffic-tbody");
   const count = document.getElementById("traffic-count");
   if (!tbody) return;
 
-  const display = rows.slice(0, 10);
-  count.textContent = `${rows.length} rows`;
+  const display = recentLogs.slice(0, 10);
+  count.textContent = `${recentLogs.length} rows`;
 
   const newIds = new Set(display.map((r) => r.id).filter((id) => !renderedIds.includes(id)));
   renderedIds = display.map((r) => r.id);
@@ -347,7 +375,7 @@ function renderTrafficRows(rows) {
     tr.addEventListener("click", () => {
       selectedRow = row;
       renderInspectPanel(row);
-      renderTrafficRows(currentState?.rows || []);
+      renderTrafficRows(currentState?.recentLogs || []);
     });
 
     tbody.appendChild(tr);

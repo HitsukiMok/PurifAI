@@ -25,8 +25,7 @@ interface ExtensionBridgeResult {
  *  background.js → broadcast to all open popup ports
  */
 export function useExtensionBridge(
-  rows: TrafficRow[],
-  metrics: BridgeMetrics,
+  onStateUpdate?: (state: any) => void
 ): ExtensionBridgeResult {
   const [extensionConnected, setExtensionConnected] = useState(false);
   const prevRowsRef = useRef<TrafficRow[]>([]);
@@ -42,6 +41,18 @@ export function useExtensionBridge(
       ) {
         setExtensionConnected(true);
         detectionAttempts.current = 0;
+        // Request initial state when connected
+        window.postMessage({ type: "PURIFAI_FETCH_REAL_STATE" }, "*");
+      }
+
+      // Handle real-time updates from extension
+      if (
+        event.source === window &&
+        event.data?.type === "PURIFAI_LIVE_UPDATE"
+      ) {
+        if (onStateUpdate && event.data.state) {
+          onStateUpdate(event.data.state);
+        }
       }
     };
 
@@ -67,43 +78,7 @@ export function useExtensionBridge(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Step 2: Broadcast updates whenever rows or metrics change ─────────
-  useEffect(() => {
-    if (!extensionConnected) return;
-
-    const rowsChanged = rows !== prevRowsRef.current;
-    const metricsChanged =
-      !prevMetricsRef.current ||
-      prevMetricsRef.current.scanned !== metrics.scanned ||
-      prevMetricsRef.current.blocked !== metrics.blocked;
-
-    if (!rowsChanged && !metricsChanged) return;
-
-    prevRowsRef.current   = rows;
-    prevMetricsRef.current = metrics;
-
-    window.postMessage(
-      {
-        type: "AGENTSHIELD_UPDATE",
-        data: {
-          rows: rows.slice(0, 20).map((r) => ({
-            id:        r.id,
-            time:      r.time,
-            source:    r.source,
-            agent:     r.agent,
-            risk:      r.risk,
-            status:    r.status,
-            technique: r.technique,
-            payload:   r.payload,
-            raw:       r.raw,
-          })),
-          metrics,
-        },
-      },
-      "*",
-    );
-    detectionAttempts.current = 0;
-  }, [rows, metrics, extensionConnected]);
+  // (Removed Step 2: we no longer broadcast mock data to the extension)
 
   return { extensionConnected };
 }

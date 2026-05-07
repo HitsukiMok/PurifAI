@@ -37,23 +37,19 @@ function Dashboard() {
   const [newestId, setNewestId] = useState<string | undefined>(initialAttack.id);
   const [blockedPulse, setBlockedPulse] = useState(0);
   const [showPanel, setShowPanel] = useState(false);
-  const tickRef = useRef<number | null>(null);
 
   // ── Extension bridge — broadcasts live data to the Chrome extension ──
-  const { extensionConnected } = useExtensionBridge(rows, { scanned, blocked, agents });
-
-  // Background ticker — adds clean rows so the feed feels alive.
-  useEffect(() => {
-    tickRef.current = window.setInterval(() => {
-      const r = makeCleanRow();
-      setRows((prev) => [r, ...prev].slice(0, 40));
-      setNewestId(r.id);
-      setScanned((s) => s + 1 + Math.floor(Math.random() * 3));
-    }, 3500);
-    return () => {
-      if (tickRef.current) window.clearInterval(tickRef.current);
-    };
-  }, []);
+  const { extensionConnected } = useExtensionBridge((state) => {
+    if (state.totalScans !== undefined) setScanned(state.totalScans);
+    if (state.threatsBlocked !== undefined) setBlocked(state.threatsBlocked);
+    // agents doesn't need to change but we can sync it
+    if (state.recentLogs) {
+      setRows(state.recentLogs);
+      if (state.recentLogs.length > 0) {
+        setNewestId(state.recentLogs[0].id);
+      }
+    }
+  });
 
   function simulateAttack() {
     const a = makeAttackRow();
