@@ -73,7 +73,6 @@ function handleStateUpdate(state) {
     renderConnection(state);
     renderMetrics({ scanned: state.totalScans, blocked: state.threatsBlocked, agents: state.agentsProtected });
     renderTrafficRows(state.recentLogs || []);
-    updateDashboardUrl(state);
   } else {
     showAuthScreen();
   }
@@ -184,7 +183,7 @@ document.getElementById("form-signup").addEventListener("submit", (e) => {
 ["open-dashboard-signin", "open-dashboard-signup"].forEach((id) => {
   const el = document.getElementById(id);
   if (el) el.addEventListener("click", () => {
-    chrome.tabs.create({ url: "http://localhost:8080" });
+    chrome.tabs.create({ url: "http://localhost:5173" });
   });
 });
 
@@ -296,9 +295,12 @@ function renderConnection(state) {
   }
 }
 
-function updateDashboardUrl(state) {
-  const btn = document.getElementById("open-dashboard-btn");
-  if (btn) btn.href = state.dashboardUrl || "http://localhost:8080";
+const openDashboardBtn = document.getElementById("open-dashboard-btn");
+if (openDashboardBtn) {
+  openDashboardBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    chrome.tabs.create({ url: "http://localhost:5173" });
+  });
 }
 
 // ── Metrics ────────────────────────────────────────────────────────────────

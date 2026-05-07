@@ -22,7 +22,12 @@ function ensureInit(callback) {
 }
 
 async function persistState() {
-  await chrome.storage.local.set({ purifaiState: state });
+  await chrome.storage.local.set({
+    purifaiState: state,
+    totalScans: state.totalScans,
+    threatsBlocked: state.threatsBlocked,
+    recentLogs: state.recentLogs
+  });
 }
 
 // Load persisted state safely
@@ -147,7 +152,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 
     else if (msg.type === "PURIFAI_STATUS_CHECK") {
-      sendResponse({ ok: true, status: "Connected" });
+      sendResponse({ status: "connected" });
+      return true;
     }
 
     else if (msg.type === "GET_STATE" || msg.type === "PURIFAI_FETCH_REAL_STATE") {

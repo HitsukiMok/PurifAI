@@ -50,8 +50,23 @@ export function useExtensionBridge(
         event.source === window &&
         event.data?.type === "PURIFAI_LIVE_UPDATE"
       ) {
-        if (onStateUpdate && event.data.state) {
-          onStateUpdate(event.data.state);
+        if (onStateUpdate && event.data.payload) {
+          const payload = event.data.payload;
+          const updates: any = {};
+          
+          if (payload.totalScans && payload.totalScans.newValue !== undefined) {
+            updates.totalScans = payload.totalScans.newValue;
+          }
+          if (payload.threatsBlocked && payload.threatsBlocked.newValue !== undefined) {
+            updates.threatsBlocked = payload.threatsBlocked.newValue;
+          }
+          if (payload.recentLogs && payload.recentLogs.newValue !== undefined) {
+            updates.recentLogs = payload.recentLogs.newValue;
+          }
+          
+          if (Object.keys(updates).length > 0) {
+            onStateUpdate(updates);
+          }
         }
       }
     };
