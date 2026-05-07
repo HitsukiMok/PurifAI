@@ -405,6 +405,9 @@
       }
 
       if (result.is_safe === false) {
+        // Triggering the Latch
+        hasTriggeredDanger = true;
+        
         // BLOCK with full overlay — not just a warning
         showBlockingOverlay(element, result);
       } else {
@@ -443,7 +446,21 @@
   }, true);
 
   // ── Gmail-Specific Observer for Email Bodies ──────────────────────────────
+  let currentEmailId = null;
+  let hasTriggeredDanger = false;
+
   var observer = new MutationObserver(function (mutations) {
+    // ── The Circuit Breaker: Short-Circuit Logic ──
+    var newEmailId = window.location.hash;
+    if (newEmailId !== currentEmailId) {
+      currentEmailId = newEmailId;
+      hasTriggeredDanger = false;
+      removeActiveOverlay();
+    }
+
+    if (hasTriggeredDanger) {
+      return; // Do absolutely nothing if danger already triggered for this thread
+    }
     var foundRelevantChange = false;
     for (var i = 0; i < mutations.length; i++) {
       var m = mutations[i];
