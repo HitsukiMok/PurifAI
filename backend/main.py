@@ -20,10 +20,12 @@ logger = logging.getLogger("purifai-backend")
 
 app = FastAPI(title="PurifAI Backend")
 
-# Allow the Chrome extension to talk to this server
+# Allow the Chrome extension and Vercel dashboard to talk to this server
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -394,3 +396,7 @@ async def feedback_stats():
         count = sum(1 for _ in reader)
 
     return {"total_reports": count, "csv_file": CSV_FILE}
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

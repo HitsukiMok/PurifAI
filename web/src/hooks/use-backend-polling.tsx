@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { TrafficRow } from "@/lib/mock-traffic";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 const POLL_INTERVAL = 2000; // 2 seconds for snappier updates
 const LOOKBACK_BUFFER = 2;  // seconds to overlap when querying, prevents missed scans
 

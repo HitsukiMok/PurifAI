@@ -1,5 +1,6 @@
 // ── PurifAI Background Service Worker ──────────────────────────────────────
 
+// TODO: Replace with deployed Railway URL (e.g., https://purifai-production.up.railway.app) before packing .crx
 const API_BASE = "http://localhost:8000";
 
 let state = {

@@ -183,7 +183,7 @@
   <!-- Backend status check -->
   <div id="backend-status" class="backend-status checking">
     <div class="status-dot"></div>
-    <span>Checking backend (localhost:8000)…</span>
+    <span>Checking backend…</span>
   </div>
 
   <!-- Test 1: Textarea -->
@@ -239,6 +239,7 @@
     // ── Backend health check ────────────────────────────────────────────────
     var statusEl = document.getElementById("backend-status");
 
+    // TODO: Update with production URL
     fetch("http://localhost:8000/")
       .then(function (r) { return r.json(); })
       .then(function (data) {

@@ -1,6 +1,10 @@
 // ── AgentShield Extension Popup Script ─────────────────────────────────────
 "use strict";
 
+// TODO: Replace with deployed Railway URL (e.g., https://purifai-production.up.railway.app) before packing .crx
+const API_BASE = "http://localhost:8000";
+
+
 // ── State ──────────────────────────────────────────────────────────────────
 let currentState  = null;
 let selectedRow   = null;
@@ -558,7 +562,7 @@ if (scanBtn) {
     formData.append("file", selectedFile, selectedFile.name);
     
     try {
-      const response = await fetch("http://localhost:8000/api/scan-file", {
+      const response = await fetch(`${API_BASE}/api/scan-file`, {
         method: "POST",
         body: formData
       });
