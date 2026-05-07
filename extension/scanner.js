@@ -579,7 +579,13 @@
           var text = container.innerText || "";
           if (text.trim()) {
               combinedText += text.trim() + "\n";
-              if (!mainElement) mainElement = container;
+              
+              // Retargeting: Prioritize the email body wrapper (.gs) instead of the subject header
+              if (container.classList.contains('a3s')) {
+                  mainElement = container.closest('.gs') || container;
+              } else if (!mainElement) {
+                  mainElement = container;
+              }
           }
         });
 
