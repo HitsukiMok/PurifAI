@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# 🧪 Isolation Test: Temporarily comment out sub-routers
-# from .scan import router as scan_router
+# 🧪 Step 1: Reintroducing routers one-by-one to catch the culprit
+from .scan import router as scan_router
 # from .scan_file import router as scan_file_router
 # from .traffic import router as traffic_router
 # from .metrics import router as metrics_router
@@ -20,8 +20,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include the routers (Commented out for isolation test)
-# app.include_router(scan_router, prefix="/api")
+# Include the routers (Reintroducing ONLY scan for now)
+app.include_router(scan_router, prefix="/api")
 # app.include_router(scan_file_router, prefix="/api")
 # app.include_router(traffic_router, prefix="/api")
 # app.include_router(metrics_router, prefix="/api")
