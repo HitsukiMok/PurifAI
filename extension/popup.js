@@ -1,8 +1,17 @@
-// ── AgentShield Extension Popup Script ─────────────────────────────────────
-"use strict";
+const API_BASE = "https://purifai-api.vercel.app";
 
-// TODO: Replace with deployed Railway URL (e.g., https://purifai-production.up.railway.app) before packing .crx
-const API_BASE = "http://localhost:8000";
+// Helper for fetch with timeout
+async function fetchWithTimeout(resource, options = {}) {
+  const { timeout = 10000 } = options; // Files might need more time
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  const response = await fetch(resource, {
+    ...options,
+    signal: controller.signal
+  });
+  clearTimeout(id);
+  return response;
+}
 
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -187,7 +196,7 @@ document.getElementById("form-signup").addEventListener("submit", (e) => {
 ["open-dashboard-signin", "open-dashboard-signup"].forEach((id) => {
   const el = document.getElementById(id);
   if (el) el.addEventListener("click", () => {
-    chrome.tabs.create({ url: "http://localhost:5173" });
+    chrome.tabs.create({ url: "https://purifai-cleaner.vercel.app" });
   });
 });
 
@@ -291,7 +300,7 @@ function renderConnection(state) {
   if (state.dashboardConnected) {
     urlDot.style.background = "var(--green)";
     urlText.classList.remove("not-connected");
-    urlText.textContent = state.dashboardUrl || "localhost — AgentShield Dashboard";
+    urlText.textContent = state.dashboardUrl || "purifai-cleaner.vercel.app — PurifAI Dashboard";
   } else {
     urlDot.style.background = "var(--amber)";
     urlText.classList.add("not-connected");
@@ -303,7 +312,7 @@ const openDashboardBtn = document.getElementById("open-dashboard-btn");
 if (openDashboardBtn) {
   openDashboardBtn.addEventListener("click", (e) => {
     e.preventDefault();
-    chrome.tabs.create({ url: "http://localhost:5173" });
+    chrome.tabs.create({ url: "https://purifai-cleaner.vercel.app" });
   });
 }
 
@@ -562,7 +571,7 @@ if (scanBtn) {
     formData.append("file", selectedFile, selectedFile.name);
     
     try {
-      const response = await fetch(`${API_BASE}/api/scan-file`, {
+      const response = await fetchWithTimeout(`${API_BASE}/api/scan-file`, {
         method: "POST",
         body: formData
       });

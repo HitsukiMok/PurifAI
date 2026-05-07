@@ -1,7 +1,17 @@
-// ── PurifAI Background Service Worker ──────────────────────────────────────
+const API_BASE = "https://purifai-api.vercel.app";
 
-// TODO: Replace with deployed Railway URL (e.g., https://purifai-production.up.railway.app) before packing .crx
-const API_BASE = "http://localhost:8000";
+// Helper for fetch with timeout
+async function fetchWithTimeout(resource, options = {}) {
+  const { timeout = 8000 } = options;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  const response = await fetch(resource, {
+    ...options,
+    signal: controller.signal
+  });
+  clearTimeout(id);
+  return response;
+}
 
 let state = {
   totalScans: 0,
@@ -101,33 +111,43 @@ chrome.runtime.onConnect.addListener((port) => {
 });
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  ensureInit(() => {
+  ensureInit(async () => {
     if (msg.type === "PURIFAI_SCAN_REQUEST") {
-      fetch(`${API_BASE}/api/scan`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: msg.text }),
-      })
-        .then((r) => {
-          if (!r.ok) return Promise.reject({ status: r.status, message: `HTTP Error ${r.status}` });
-          return r.json();
-        })
-        .then((data) => {
-          handleScanResult(data, sender);
-          sendResponse({ ok: true, data });
-        })
-        .catch((err) => sendResponse({ ok: false, error: err.message || "Unknown error", status: err.status }));
+      try {
+        const r = await fetchWithTimeout(`${API_BASE}/api/scan`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: msg.text }),
+        });
+        
+        if (!r.ok) {
+           // Handle server errors (e.g. 504 Gateway Timeout on Vercel)
+           throw new Error(`HTTP ${r.status}`);
+        }
+        
+        const data = await r.json();
+        handleScanResult(data, sender);
+        sendResponse({ ok: true, data });
+      } catch (err) {
+        console.warn("[PurifAI] Scan fetch failed, applying fail-open:", err);
+        const failOpenData = { is_safe: true, heuristic: "Timeout Bypass", confidence: 0, text: msg.text };
+        handleScanResult(failOpenData, sender);
+        sendResponse({ ok: true, data: failOpenData });
+      }
     }
 
     else if (msg.type === "PURIFAI_FEEDBACK_REQUEST") {
-      fetch(`${API_BASE}/api/feedback`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(msg.payload),
-      })
-        .then((r) => r.json())
-        .then((data) => sendResponse({ ok: true, data }))
-        .catch((err) => sendResponse({ ok: false, error: err.message }));
+      try {
+        const r = await fetchWithTimeout(`${API_BASE}/api/feedback`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(msg.payload),
+        });
+        const data = await r.json();
+        sendResponse({ ok: true, data });
+      } catch (err) {
+        sendResponse({ ok: false, error: err.message });
+      }
     }
 
     else if (msg.type === "PURIFAI_SCAN_RESULT") {

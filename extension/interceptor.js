@@ -84,9 +84,8 @@
 
   // URLs to never intercept (our own infra + static assets)
   var SKIP_URL_PATTERNS = [
-    /localhost:8000/,   // Our backend API
-    /localhost:8080/,   // Our dashboard
-    /localhost:5173/,   // Vite dev server
+    /purifai-api\.vercel\.app/,   // Our backend API
+    /purifai-cleaner\.vercel\.app/, // Our dashboard
     /chrome-extension:\/\//,
     /\.(png|jpg|jpeg|gif|svg|ico|webp|avif|bmp)(\?|#|$)/i,
     /\.(woff2?|ttf|eot|otf)(\?|#|$)/i,

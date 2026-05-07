@@ -4,10 +4,10 @@
   "short_name": "PurifAI",
   "description": "Real-time AI protection against prompt injections. Powered by DeBERTa v3.",
   "version": "1.0.0",
-  "permissions": ["storage", "activeTab", "scripting", "tabs", "downloads"],
+  "permissions": ["storage", "activeTab", "scripting", "tabs"],
   "host_permissions": [
-    "http://localhost:*/*",
-    "https://*.agentshield.io/*",
+    "https://purifai-api.vercel.app/*",
+    "https://purifai-cleaner.vercel.app/*",
     "*://mail.google.com/*"
   ],
 
@@ -36,8 +36,7 @@
     {
       "matches": [
         "*://mail.google.com/*",
-        "http://localhost:*/*",
-        "https://*.agentshield.io/*"
+        "https://purifai-cleaner.vercel.app/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle",
