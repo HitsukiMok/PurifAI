@@ -264,7 +264,7 @@ function checkBackgroundStatus() {
     chrome.runtime.sendMessage({ type: "PURIFAI_STATUS_CHECK" }, (response) => {
       if (timedOut) return;
       clearTimeout(timer);
-      if (chrome.runtime.lastError || !response || !response.ok) {
+      if (chrome.runtime.lastError || !response || response.status !== "connected") {
         badge.classList.remove("live"); badge.classList.add("offline");
         label.textContent = "Disconnected";
       } else {
