@@ -140,7 +140,6 @@ async def scan_text(request: ScanRequest, http_request: Request):
         }
 
         # Log to in-memory scan history for dashboard
-        import time
         scan_entry = {
             "id": str(uuid.uuid4()),
             "timestamp": time.time(),
