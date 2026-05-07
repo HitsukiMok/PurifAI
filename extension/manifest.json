@@ -4,7 +4,7 @@
   "short_name": "PurifAI",
   "description": "Real-time AI protection against prompt injections. Powered by DeBERTa v3.",
   "version": "1.0.0",
-  "permissions": ["storage", "activeTab", "scripting", "tabs"],
+  "permissions": ["storage", "activeTab", "scripting", "tabs", "downloads"],
   "host_permissions": [
     "http://localhost:*/*",
     "https://*.agentshield.io/*",

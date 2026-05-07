@@ -688,4 +688,145 @@
   window.postMessage({ type: "PURIFAI_SCANNER_READY" }, "*");
   console.log("[PurifAI] Scanner ready — notified interceptor.");
 
+  // ── PDF/TXT Attachment Scanning ───────────────────────────────────────────
+  // Watches for Gmail attachment containers and injects a "Scan" button.
+
+  var scannedAttachments = new Set();
+
+  function scanFileViaBackground(fileUrl, filename, attachmentEl) {
+    return new Promise(function(resolve) {
+      try {
+        chrome.runtime.sendMessage(
+          { type: "PURIFAI_SCAN_FILE_REQUEST", fileUrl: fileUrl, filename: filename },
+          function(response) {
+            if (chrome.runtime.lastError) {
+              console.warn("[PurifAI] File scan sendMessage error:", chrome.runtime.lastError.message);
+              resolve(null);
+              return;
+            }
+            resolve(response);
+          }
+        );
+      } catch(e) {
+        console.error("[PurifAI] File scan exception:", e);
+        resolve(null);
+      }
+    });
+  }
+
+  function injectScanButton(attachmentEl) {
+    if (attachmentEl.querySelector('.purifai-scan-attachment-btn')) return;
+
+    var downloadLink = attachmentEl.querySelector('a[href]');
+    if (!downloadLink) return;
+
+    var href = downloadLink.href || "";
+    var filename = downloadLink.getAttribute('download') || 
+                   downloadLink.textContent.trim() || 
+                   "attachment";
+    
+    // Only target PDF and TXT files
+    var ext = filename.split('.').pop().toLowerCase();
+    if (!['pdf', 'txt'].includes(ext)) return;
+
+    var btn = document.createElement('button');
+    btn.className = 'purifai-scan-attachment-btn';
+    btn.innerHTML = '🛡️ Scan';
+    btn.title = 'Scan this file with PurifAI';
+
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      e.preventDefault();
+
+      btn.innerHTML = '⏳ Scanning...';
+      btn.disabled = true;
+
+      // Show shield over the attachment container
+      attachmentEl.style.position = 'relative';
+      var shield = document.createElement('div');
+      shield.className = 'purifai-glass-shield purifai-attachment-shield';
+      shield.innerHTML = '<div class="purifai-glass-spinner"></div><div>Scanning file...</div>';
+      shield.addEventListener('click', function(ev) { ev.stopPropagation(); ev.preventDefault(); }, true);
+      attachmentEl.appendChild(shield);
+
+      scanFileViaBackground(href, filename, attachmentEl).then(function(response) {
+        // Remove shield
+        var s = attachmentEl.querySelector('.purifai-attachment-shield');
+        if (s) s.remove();
+
+        if (!response || !response.ok) {
+          btn.innerHTML = '⚠️ Error';
+          btn.disabled = false;
+          setTimeout(function() { btn.innerHTML = '🛡️ Scan'; }, 2000);
+          return;
+        }
+
+        var data = response.data;
+        if (data.is_safe) {
+          btn.innerHTML = '✅ Safe';
+          btn.classList.add('purifai-scan-safe');
+          scannedAttachments.add(href);
+          if (data.partial_scan) {
+            btn.title = data.note || 'Partial scan completed';
+          }
+        } else {
+          btn.innerHTML = '🚨 Blocked';
+          btn.classList.add('purifai-scan-danger');
+          // Show the blocking overlay with file-specific info
+          showBlockingOverlay(document.body, {
+            text: data.malicious_text || "Malicious content found in " + filename,
+            confidence: data.confidence,
+            label: data.label,
+            is_safe: false,
+          });
+        }
+      });
+    });
+
+    // Insert the button next to the attachment
+    attachmentEl.style.position = 'relative';
+    attachmentEl.appendChild(btn);
+  }
+
+  function scanForAttachments() {
+    // Gmail attachment selectors
+    var attachments = document.querySelectorAll('.aQA, .aZo, [download_url]');
+    attachments.forEach(function(el) {
+      injectScanButton(el);
+    });
+  }
+
+  // Observe for attachment containers appearing
+  var attachmentObserver = new MutationObserver(function(mutations) {
+    var hasNew = false;
+    for (var i = 0; i < mutations.length; i++) {
+      if (mutations[i].addedNodes.length > 0) {
+        hasNew = true;
+        break;
+      }
+    }
+    if (hasNew) scanForAttachments();
+  });
+
+  setTimeout(function() {
+    if (document.body) {
+      attachmentObserver.observe(document.body, { childList: true, subtree: true });
+      scanForAttachments(); // Initial scan
+      console.log("[PurifAI] Attachment observer started.");
+    }
+  }, 1500);
+
+  // ── Listen for download-blocked events from background.js ────────────────
+  chrome.runtime.onMessage.addListener(function(msg) {
+    if (msg.type === "PURIFAI_FILE_BLOCKED" && msg.data) {
+      console.log("[PurifAI] 🚨 Download blocked by background:", msg.data.filename);
+      showBlockingOverlay(document.body, {
+        text: msg.data.malicious_text || "Malicious content in " + msg.data.filename,
+        confidence: msg.data.confidence,
+        label: msg.data.label,
+        is_safe: false,
+      });
+    }
+  });
+
 })();

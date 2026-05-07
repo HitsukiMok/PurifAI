@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
@@ -6,8 +6,10 @@ import torch
 import csv
 import os
 import re
+import io
 import hashlib
 import functools
+from pypdf import PdfReader
 from datetime import datetime
 import time
 
@@ -76,6 +78,25 @@ class ScanRequest(BaseModel):
     text: str
 
 CLIENT_RATE_LIMITS = {}
+FILE_RATE_LIMITS = {}
+
+MAX_FILE_SIZE = 2 * 1024 * 1024  # 2 MB
+MAX_PDF_PAGES = 5
+
+def chunk_text(text, chunk_size=400, overlap=50):
+    """Split text into overlapping blocks of ~chunk_size words.
+    Overlap prevents missing injections that span chunk boundaries."""
+    words = text.split()
+    if len(words) <= chunk_size:
+        return [text]
+    chunks = []
+    start = 0
+    while start < len(words):
+        end = start + chunk_size
+        chunk = ' '.join(words[start:end])
+        chunks.append(chunk)
+        start = end - overlap
+    return chunks
 
 @app.post("/api/scan")
 async def scan_text(request: ScanRequest, http_request: Request):
@@ -161,6 +182,130 @@ async def scan_text(request: ScanRequest, http_request: Request):
         logger.error(f"Inference failed: {e}")
         return {"error": "Inference failed", "exception": str(e)}
 
+
+@app.post("/api/scan-file")
+async def scan_file(http_request: Request, file: UploadFile = File(...)):
+    """Scan an uploaded PDF or TXT file for prompt injections.
+    Files are processed strictly in memory — never saved to disk."""
+    # Separate rate limiter: 1 request per 10 seconds per IP
+    client_ip = http_request.client.host
+    now = time.time()
+    last_file_scan = FILE_RATE_LIMITS.get(client_ip, 0)
+    if now - last_file_scan < 10:
+        logger.warning(f"File scan rate limit exceeded for IP {client_ip}")
+        raise HTTPException(status_code=429, detail="Too Many Requests", headers={"Retry-After": "10"})
+    FILE_RATE_LIMITS[client_ip] = now
+
+    # Validate file type
+    filename = file.filename or ""
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ""
+    if ext not in ('pdf', 'txt'):
+        raise HTTPException(status_code=400, detail="Unsupported file type. Only .pdf and .txt are allowed.")
+
+    # Read file into memory
+    file_bytes = await file.read()
+    if len(file_bytes) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024*1024)} MB.")
+
+    # Extract text
+    raw_text = ""
+    partial_scan = False
+    try:
+        if ext == 'pdf':
+            reader = PdfReader(io.BytesIO(file_bytes))
+            total_pages = len(reader.pages)
+            pages_to_scan = min(total_pages, MAX_PDF_PAGES)
+            partial_scan = total_pages > MAX_PDF_PAGES
+            for i in range(pages_to_scan):
+                page_text = reader.pages[i].extract_text() or ""
+                raw_text += page_text + "\n"
+        elif ext == 'txt':
+            raw_text = file_bytes.decode('utf-8', errors='replace')
+    except Exception as e:
+        logger.error(f"File parsing failed: {e}")
+        raise HTTPException(status_code=422, detail=f"Could not parse file: {str(e)}")
+    finally:
+        await file.close()
+
+    cleaned_text = re.sub(r'<[^>]+>', ' ', raw_text).strip()
+    if len(cleaned_text) < 12:
+        return {
+            "filename": filename,
+            "is_safe": True,
+            "label": "SAFE",
+            "confidence": 1.0,
+            "total_chunks": 0,
+            "flagged_chunk": None,
+            "malicious_text": None,
+            "partial_scan": partial_scan,
+            "note": "File contained no meaningful text to scan."
+        }
+
+    # Chunk and scan
+    chunks = chunk_text(cleaned_text)
+    logger.info(f"Scanning file '{filename}': {len(chunks)} chunks from {ext.upper()}")
+
+    worst_chunk_idx = None
+    worst_confidence = 0.0
+    worst_text = ""
+    file_is_safe = True
+
+    for idx, chunk in enumerate(chunks):
+        text_hash = hashlib.sha256(chunk.encode('utf-8')).hexdigest()
+        prediction = cached_inference(text_hash, chunk)
+        label = prediction['label']
+        confidence = prediction['score']
+
+        chunk_safe = (label == 'SAFE')
+
+        # Apply heuristics per chunk
+        if not chunk_safe:
+            has_high_danger = HIGH_DANGER_REGEX.search(chunk) is not None
+            if not has_high_danger:
+                word_count = len(chunk.split())
+                has_marketing = MARKETING_REGEX.search(chunk) is not None
+                if word_count < 50 or has_marketing:
+                    chunk_safe = True
+
+        if not chunk_safe and confidence > worst_confidence:
+            worst_confidence = confidence
+            worst_chunk_idx = idx
+            worst_text = chunk[:300]
+            file_is_safe = False
+
+    result_label = "SAFE" if file_is_safe else "INJECTION"
+    logger.info(f"File scan complete: {filename} -> {result_label} (chunks: {len(chunks)})")
+
+    scan_result = {
+        "filename": filename,
+        "is_safe": file_is_safe,
+        "label": result_label,
+        "confidence": worst_confidence if not file_is_safe else 0.0,
+        "total_chunks": len(chunks),
+        "flagged_chunk": worst_chunk_idx,
+        "malicious_text": worst_text if not file_is_safe else None,
+        "partial_scan": partial_scan,
+    }
+    if partial_scan:
+        scan_result["note"] = f"Only the first {MAX_PDF_PAGES} pages were scanned."
+
+    # Log to scan history
+    scan_entry = {
+        "id": str(uuid.uuid4()),
+        "timestamp": time.time(),
+        "time": datetime.now().strftime("%H:%M:%S"),
+        "text": f"[FILE] {filename} — {worst_text[:100]}" if not file_is_safe else f"[FILE] {filename} — SAFE",
+        "label": result_label,
+        "confidence": worst_confidence if not file_is_safe else 0.0,
+        "is_safe": file_is_safe,
+        "source": "file-scan",
+    }
+    scan_log.appendleft(scan_entry)
+    scan_metrics["scanned"] += 1
+    if not file_is_safe:
+        scan_metrics["blocked"] += 1
+
+    return scan_result
 
 # ──────────────────────────────────────────────────────────────
 #  In-memory scan log for dashboard
