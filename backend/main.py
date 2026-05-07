@@ -56,6 +56,11 @@ MARKETING_REGEX = re.compile(
     re.IGNORECASE
 )
 
+HIGH_DANGER_REGEX = re.compile(
+    r"(ignore all previous instructions|system override|jailbreak|you are now)",
+    re.IGNORECASE
+)
+
 @functools.lru_cache(maxsize=500)
 def cached_inference(text_hash: str, cleaned_text: str):
     """
@@ -85,16 +90,26 @@ async def scan_text(request: ScanRequest):
         confidence = prediction['score']
         is_safe = (label == 'SAFE')
         
-        # 4. False Positive Mitigations (Downgrade Logic)
+        heuristic_applied = "None"
+        
+        # 4. False Positive Mitigations (Downgrade Logic) & High-Danger Veto
         if not is_safe:
-            word_count = len(cleaned_text.split())
-            has_marketing = MARKETING_REGEX.search(cleaned_text) is not None
+            has_high_danger = HIGH_DANGER_REGEX.search(cleaned_text) is not None
             
-            if word_count < 50 or has_marketing:
-                logger.info("Downgrading false positive using marketing heuristics.")
-                is_safe = True
-                label = 'SAFE (Marketing)'
+            if has_high_danger:
+                heuristic_applied = "Veto (High Danger)"
+            else:
+                word_count = len(cleaned_text.split())
+                has_marketing = MARKETING_REGEX.search(cleaned_text) is not None
+                
+                if word_count < 50 or has_marketing:
+                    heuristic_applied = "Downgraded (Marketing/Short)"
+                    is_safe = True
+                    label = 'SAFE (Marketing)'
 
+        logger.info(f"[DEBUG] Raw Text Sent to Model: {cleaned_text[:200]}...")
+        logger.info(f"[DEBUG] Model Score: {confidence:.4f}")
+        logger.info(f"[DEBUG] Heuristic Applied: {heuristic_applied}")
         logger.info(f"Scan complete. Result: {label} ({confidence:.4f})")
 
         scan_result = {
