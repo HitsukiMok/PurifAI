@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
 import time
 import uuid
@@ -8,16 +8,15 @@ from .utils import (
     MARKETING_REGEX, get_supabase, get_text_hash
 )
 
-app = FastAPI()
+# 1. Change FastAPI() to APIRouter()
+router = APIRouter()
 
 class ScanRequest(BaseModel):
     text: str
 
-@app.post("/api/scan")
+# 2. Change @app.post to @router.post and remove the "/api" prefix
+@router.post("/scan")
 async def scan_text(request: ScanRequest, http_request: Request):
-    # Rate Limiting: In serverless, we can't easily use in-memory dicts.
-    # For MVP, we skip complex rate limiting or use a shared Redis/Upstash later.
-    
     raw_text = request.text
     cleaned_text = clean_text(raw_text)
     
@@ -29,8 +28,6 @@ async def scan_text(request: ScanRequest, http_request: Request):
         return hf_result
 
     # 3. Process Predictions
-    # model returns labels 'SAFE' and 'INJECTION' (or similar)
-    # The dictionary from utils is {"SAFE": 0.99, "INJECTION": 0.01}
     injection_score = hf_result.get("INJECTION", 0.0)
     safe_score = hf_result.get("SAFE", 0.0)
     
@@ -67,7 +64,6 @@ async def scan_text(request: ScanRequest, http_request: Request):
             "source": "extension-scan"
         }).execute()
     except Exception as e:
-        # Don't crash the scan just because logging failed
         print(f"Supabase logging failed: {e}")
 
     return {
