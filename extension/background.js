@@ -32,6 +32,13 @@ function ensureInit(callback) {
   }
 }
 
+function formatTime(date) {
+  const h = date.getHours().toString().padStart(2, '0');
+  const m = date.getMinutes().toString().padStart(2, '0');
+  const s = date.getSeconds().toString().padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
+
 async function persistState() {
   await chrome.storage.local.set({
     purifaiState: state,
@@ -64,10 +71,13 @@ chrome.runtime.onConnect.addListener((port) => {
   port.onMessage.addListener((msg) => {
     ensureInit(() => {
       if (msg.type === "SIMULATE_ATTACK") {
+        const now = new Date();
         const row = {
           id: crypto.randomUUID(),
-          timestamp: new Date().toISOString(),
+          timestamp: now.toISOString(),
+          time: formatTime(now),
           source: "email://demo@malicious.com",
+          agent: "InboxTriage",
           targetAgent: "InboxTriage",
           risk: 97,
           status: "Blocked",
@@ -197,15 +207,18 @@ function handleScanResult(scan, sender) {
   const hostname = (sender?.tab?.url || "unknown")
     .replace(/^https?:\/\//, "").split("/")[0];
 
+  const now = new Date();
   const row = {
     id: crypto.randomUUID(),
-    timestamp: new Date().toISOString(),
+    timestamp: now.toISOString(),
+    time: formatTime(now),
     source: `page://${hostname}`,
+    agent: "InboxTriage",
+    targetAgent: "InboxTriage",
     rawText: scan.text || "Unknown text",
     sanitizedText: scan.is_safe ? (scan.text || "Unknown text") : "[REDACTED - Prompt Injection]",
     threatType: scan.is_safe ? "None" : "System Override",
     status: scan.is_safe ? "Clean" : "Blocked",
-    targetAgent: "InboxTriage",
     risk: scan.is_safe
       ? Math.floor(Math.random() * 10)
       : Math.round(scan.confidence * 100),
