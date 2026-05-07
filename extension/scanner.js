@@ -421,16 +421,26 @@
     debounceTimer = setTimeout(function () { handleInput(t); }, DEBOUNCE_MS);
   }, true);
 
-  // MutationObserver as final fallback
-  var observer = new MutationObserver(function () {
-    var editable = document.activeElement;
-    if (!editable) return;
-    if (!editable.isContentEditable &&
-        editable.getAttribute("contenteditable") !== "true" &&
-        editable.tagName !== "TEXTAREA") return;
+  // ── Gmail-Specific Observer for Email Bodies ──────────────────────────────
+  var observer = new MutationObserver(function (mutations) {
+    var foundRelevantChange = false;
+    for (var i = 0; i < mutations.length; i++) {
+      var m = mutations[i];
+      if (m.addedNodes.length > 0 || m.type === 'characterData') {
+        foundRelevantChange = true;
+        break;
+      }
+    }
 
-    clearTimeout(mutationDebounce);
-    mutationDebounce = setTimeout(function () { handleInput(editable); }, DEBOUNCE_MS);
+    if (foundRelevantChange) {
+      clearTimeout(mutationDebounce);
+      mutationDebounce = setTimeout(function () {
+        var emailContainers = document.querySelectorAll('.a3s.aiL, div[data-message-id]');
+        emailContainers.forEach(function (container) {
+          handleInput(container);
+        });
+      }, DEBOUNCE_MS);
+    }
   });
 
   // Start observing after a short delay to let the page settle
@@ -441,7 +451,7 @@
         subtree: true,
         characterData: true,
       });
-      console.log("[PurifAI] MutationObserver started.");
+      console.log("[PurifAI] Gmail MutationObserver started.");
     }
   }, 1000);
 

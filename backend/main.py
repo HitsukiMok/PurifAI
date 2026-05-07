@@ -106,8 +106,8 @@ scan_metrics = {"scanned": 0, "blocked": 0}
 def read_root():
     return {"status": "PurifAI Backend is running"}
 
-@app.get("/api/recent-scans")
-async def recent_scans(since: float = 0):
+@app.get("/api/traffic")
+async def traffic_scans(since: float = 0):
     """Return scans newer than `since` (unix timestamp in seconds).
     The dashboard polls this every few seconds.
     Uses >= comparison to ensure boundary scans are not missed;
