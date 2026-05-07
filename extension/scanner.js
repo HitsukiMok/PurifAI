@@ -515,7 +515,8 @@
   // ── Gmail-Specific Observer for Email Bodies ──────────────────────────────
   let currentEmailId = null;
   let hasTriggeredDanger = false;
-  let isFirstScan = true;
+  let isCurrentlyScanning = false;
+  let apiDebounceTimer = null;
 
   var observer = new MutationObserver(function (mutations) {
     // ── The Circuit Breaker: Short-Circuit Logic ──
@@ -523,13 +524,16 @@
     if (newEmailId !== currentEmailId) {
       currentEmailId = newEmailId;
       hasTriggeredDanger = false;
-      isFirstScan = true;
       removeActiveOverlay();
     }
 
     if (hasTriggeredDanger) {
       return; // Do absolutely nothing if danger already triggered for this thread
     }
+    
+    // Clear the timeout: Every time the MutationObserver fires
+    clearTimeout(apiDebounceTimer);
+
     var foundRelevantChange = false;
     for (var i = 0; i < mutations.length; i++) {
       var m = mutations[i];
@@ -540,22 +544,46 @@
     }
 
     if (foundRelevantChange) {
-      clearTimeout(mutationDebounce);
-      if (isFirstScan) {
-        isFirstScan = false;
+      // Implement a strict 250ms Debounce Timer
+      apiDebounceTimer = setTimeout(function () {
+        // Preserve the Lock: set to true exactly when timer executes
+        if (isCurrentlyScanning) return;
+        isCurrentlyScanning = true;
+
         var emailContainers = document.querySelectorAll('.a3s.aiL, h2.hP');
+        var combinedText = "";
+        var mainElement = null;
+
         emailContainers.forEach(function (container) {
-          handleInput(container);
+          var text = container.value || container.textContent || container.innerText || "";
+          if (text.trim()) {
+              combinedText += text.trim() + "\n";
+              if (!mainElement) mainElement = container;
+          }
         });
-      } else {
-        mutationDebounce = setTimeout(function () {
-          // Strict targeting: Message bodies and Subject lines
-          var emailContainers = document.querySelectorAll('.a3s.aiL, h2.hP');
-          emailContainers.forEach(function (container) {
-            handleInput(container);
-          });
-        }, DEBOUNCE_MS);
-      }
+
+        var trimmed = combinedText.trim();
+        if (trimmed.length < MIN_TEXT_LENGTH || trimmed === lastScannedText) {
+          isCurrentlyScanning = false;
+          return;
+        }
+
+        var msgId = mainElement ? getMessageId(mainElement) : currentEmailId;
+        if (processedMessageIds.has(msgId)) {
+          isCurrentlyScanning = false;
+          return;
+        }
+
+        lastScannedText = trimmed;
+        if (mainElement) showGlassShield(mainElement);
+
+        scanText(trimmed).then(function (result) {
+          isCurrentlyScanning = false;
+          if (mainElement) {
+              handleScanResponse(result, mainElement, trimmed);
+          }
+        });
+      }, 250);
     }
   });
 
