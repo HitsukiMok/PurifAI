@@ -6,7 +6,7 @@
   "version": "1.0.0",
   "permissions": ["storage", "activeTab", "scripting", "tabs"],
   "host_permissions": [
-    "https://*.hf.space/*",
+    "https://hizuk-purifai-api.hf.space/*",
     "https://purifai-cleaner.vercel.app/*",
     "*://mail.google.com/*"
   ],
