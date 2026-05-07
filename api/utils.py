@@ -74,7 +74,7 @@ def query_huggingface(text: str):
         
         return results
     except requests.exceptions.Timeout:
-        return {"error": "hf_timeout", "warming_up": False}
+        return {"warming_up": True, "error": "timeout"}
     except Exception as e:
         print(f"Inference error in utils.py: {str(e)}")
         return {"error": "hf_unknown", "warming_up": False}
