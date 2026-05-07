@@ -537,6 +537,26 @@
     var foundRelevantChange = false;
     for (var i = 0; i < mutations.length; i++) {
       var m = mutations[i];
+      
+      // ── UI Blindspot: Ignore our own UI wrappers ──
+      var target = m.target;
+      if (target.nodeType === Node.ELEMENT_NODE) {
+          if (target.className && typeof target.className === 'string' && target.className.includes('purifai-')) continue;
+          if (target.closest && target.closest('[class*="purifai-"]')) continue;
+      } else if (target.parentNode && target.parentNode.nodeType === Node.ELEMENT_NODE) {
+          if (target.parentNode.closest && target.parentNode.closest('[class*="purifai-"]')) continue;
+      }
+
+      var hasPurifaiNode = false;
+      for (var j = 0; j < m.addedNodes.length; j++) {
+         var n = m.addedNodes[j];
+         if (n.nodeType === Node.ELEMENT_NODE && n.className && typeof n.className === 'string' && n.className.includes('purifai-')) {
+             hasPurifaiNode = true;
+             break;
+         }
+      }
+      if (hasPurifaiNode) continue;
+
       if (m.addedNodes.length > 0 || m.type === 'characterData') {
         foundRelevantChange = true;
         break;
@@ -555,7 +575,8 @@
         var mainElement = null;
 
         emailContainers.forEach(function (container) {
-          var text = container.value || container.textContent || container.innerText || "";
+          // Precision DOM Targeting: Use innerText to ignore hidden scripts (<script>, <style>)
+          var text = container.innerText || "";
           if (text.trim()) {
               combinedText += text.trim() + "\n";
               if (!mainElement) mainElement = container;
