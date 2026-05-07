@@ -195,8 +195,16 @@ chrome.downloads.onDeterminingFilename.addListener((downloadItem, suggest) => {
     return;
   }
 
-  // Pause the download by suggesting the original filename
+  // Suggest filename to keep the download alive
   suggest({ filename: downloadItem.filename });
+
+  // Notify content script: show Glass Shield
+  if (downloadItem.tabId) {
+    chrome.tabs.sendMessage(downloadItem.tabId, {
+      type: "PURIFAI_FILE_SCANNING",
+      data: { filename: filename },
+    }).catch(() => {});
+  }
 
   // Fetch the file and scan it
   fetch(downloadItem.url)
@@ -224,14 +232,25 @@ chrome.downloads.onDeterminingFilename.addListener((downloadItem, suggest) => {
           chrome.tabs.sendMessage(downloadItem.tabId, {
             type: "PURIFAI_FILE_BLOCKED",
             data: data,
-          });
+          }).catch(() => {});
+        }
+      } else {
+        // Safe — remove the Glass Shield
+        if (downloadItem.tabId) {
+          chrome.tabs.sendMessage(downloadItem.tabId, {
+            type: "PURIFAI_FILE_SCAN_DONE",
+          }).catch(() => {});
         }
       }
-      // If safe, download proceeds automatically
     })
     .catch((err) => {
       console.warn("[PurifAI] Download intercept failed, allowing download:", err);
-      // On error, allow the download to proceed (fail-open for downloads)
+      // Remove shield on error too
+      if (downloadItem.tabId) {
+        chrome.tabs.sendMessage(downloadItem.tabId, {
+          type: "PURIFAI_FILE_SCAN_DONE",
+        }).catch(() => {});
+      }
     });
 
   return true; // Indicates async handling

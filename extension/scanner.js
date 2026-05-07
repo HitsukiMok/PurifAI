@@ -714,18 +714,47 @@
     });
   }
 
-  function injectScanButton(attachmentEl) {
-    if (attachmentEl.querySelector('.purifai-scan-attachment-btn')) return;
+  function injectScanButton(nativeBtn) {
+    // Find the parent attachment card (action bar container)
+    var attachmentCard = nativeBtn.closest('[class]') || nativeBtn.parentElement;
+    if (!attachmentCard) return;
+    if (attachmentCard.querySelector('.purifai-scan-attachment-btn')) return;
 
-    var downloadLink = attachmentEl.querySelector('a[href]');
-    if (!downloadLink) return;
+    // Extract filename from the card — look for download_url attr, aria-label, or title
+    var filename = "";
+    var fileUrl = "";
 
-    var href = downloadLink.href || "";
-    var filename = downloadLink.getAttribute('download') || 
-                   downloadLink.textContent.trim() || 
-                   "attachment";
-    
-    // Only target PDF and TXT files
+    // Strategy 1: [download_url] contains "filename:mimetype:url"
+    var dlUrlEl = attachmentCard.closest('[download_url]') || attachmentCard.querySelector('[download_url]');
+    if (dlUrlEl) {
+      var dlUrl = dlUrlEl.getAttribute('download_url') || "";
+      var parts = dlUrl.split(':');
+      if (parts.length >= 3) {
+        filename = parts[0];
+        fileUrl = parts.slice(2).join(':'); // URL may contain colons
+      }
+    }
+
+    // Strategy 2: Look for an <a> with download or href
+    if (!filename) {
+      var downloadLink = attachmentCard.querySelector('a[href][download]') || attachmentCard.querySelector('a[href]');
+      if (downloadLink) {
+        filename = downloadLink.getAttribute('download') || downloadLink.textContent.trim() || "";
+        fileUrl = downloadLink.href || "";
+      }
+    }
+
+    // Strategy 3: Aria label or title on the card itself
+    if (!filename) {
+      var titleEl = attachmentCard.querySelector('[title]') || attachmentCard.querySelector('[aria-label]');
+      if (titleEl) {
+        filename = titleEl.getAttribute('title') || titleEl.getAttribute('aria-label') || "";
+      }
+    }
+
+    if (!filename) return;
+
+    // MIME Type Check: Only inject for PDF and TXT files
     var ext = filename.split('.').pop().toLowerCase();
     if (!['pdf', 'txt'].includes(ext)) return;
 
@@ -741,17 +770,16 @@
       btn.innerHTML = '⏳ Scanning...';
       btn.disabled = true;
 
-      // Show shield over the attachment container
-      attachmentEl.style.position = 'relative';
+      // Show shield over the attachment card
+      attachmentCard.style.position = 'relative';
       var shield = document.createElement('div');
       shield.className = 'purifai-glass-shield purifai-attachment-shield';
       shield.innerHTML = '<div class="purifai-glass-spinner"></div><div>Scanning file...</div>';
       shield.addEventListener('click', function(ev) { ev.stopPropagation(); ev.preventDefault(); }, true);
-      attachmentEl.appendChild(shield);
+      attachmentCard.appendChild(shield);
 
-      scanFileViaBackground(href, filename, attachmentEl).then(function(response) {
-        // Remove shield
-        var s = attachmentEl.querySelector('.purifai-attachment-shield');
+      scanFileViaBackground(fileUrl, filename, attachmentCard).then(function(response) {
+        var s = attachmentCard.querySelector('.purifai-attachment-shield');
         if (s) s.remove();
 
         if (!response || !response.ok) {
@@ -765,14 +793,13 @@
         if (data.is_safe) {
           btn.innerHTML = '✅ Safe';
           btn.classList.add('purifai-scan-safe');
-          scannedAttachments.add(href);
+          scannedAttachments.add(fileUrl);
           if (data.partial_scan) {
             btn.title = data.note || 'Partial scan completed';
           }
         } else {
           btn.innerHTML = '🚨 Blocked';
           btn.classList.add('purifai-scan-danger');
-          // Show the blocking overlay with file-specific info
           showBlockingOverlay(document.body, {
             text: data.malicious_text || "Malicious content found in " + filename,
             confidence: data.confidence,
@@ -783,15 +810,15 @@
       });
     });
 
-    // Insert the button next to the attachment
-    attachmentEl.style.position = 'relative';
-    attachmentEl.appendChild(btn);
+    // Append button to the parent attachment card
+    attachmentCard.style.position = 'relative';
+    attachmentCard.appendChild(btn);
   }
 
   function scanForAttachments() {
-    // Gmail attachment selectors
-    var attachments = document.querySelectorAll('.aQA, .aZo, [download_url]');
-    attachments.forEach(function(el) {
+    // Robust selectors: target Gmail's native download buttons and download_url elements
+    var downloadBtns = document.querySelectorAll('div[data-tooltip="Download"], div[data-tooltip="Download attachment"], a[download_url], [download_url]');
+    downloadBtns.forEach(function(el) {
       injectScanButton(el);
     });
   }
@@ -816,9 +843,29 @@
     }
   }, 1500);
 
-  // ── Listen for download-blocked events from background.js ────────────────
+  // ── Listen for download-blocked / scanning events from background.js ─────
   chrome.runtime.onMessage.addListener(function(msg) {
+    if (msg.type === "PURIFAI_FILE_SCANNING" && msg.data) {
+      // Background is intercepting a download — show Glass Shield
+      console.log("[PurifAI] 🔍 Download intercepted, scanning:", msg.data.filename);
+      var emailBody = document.querySelector('.gs') || document.body;
+      emailBody.style.position = 'relative';
+      var shield = document.createElement('div');
+      shield.className = 'purifai-glass-shield purifai-download-shield';
+      shield.innerHTML = '<div class="purifai-glass-spinner"></div><div>PurifAI: Scanning download (' + escapeHtml(msg.data.filename) + ')...</div>';
+      shield.addEventListener('click', function(ev) { ev.stopPropagation(); ev.preventDefault(); }, true);
+      emailBody.appendChild(shield);
+    }
+    if (msg.type === "PURIFAI_FILE_SCAN_DONE") {
+      // Remove download shield
+      var shields = document.querySelectorAll('.purifai-download-shield');
+      shields.forEach(function(s) { s.remove(); });
+    }
     if (msg.type === "PURIFAI_FILE_BLOCKED" && msg.data) {
+      // Remove download shield first
+      var shields = document.querySelectorAll('.purifai-download-shield');
+      shields.forEach(function(s) { s.remove(); });
+      
       console.log("[PurifAI] 🚨 Download blocked by background:", msg.data.filename);
       showBlockingOverlay(document.body, {
         text: msg.data.malicious_text || "Malicious content in " + msg.data.filename,
