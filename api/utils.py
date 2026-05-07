@@ -4,7 +4,6 @@ import hashlib
 from supabase import create_client, Client
 from fastapi import HTTPException
 from transformers import pipeline, AutoTokenizer
-from optimum.onnxruntime import ORTModelForSequenceClassification
 
 # ── Thread Tuning (2-vCPU Optimization) ───────────────────────────────────────
 os.environ["OMP_NUM_THREADS"] = "2"
@@ -21,28 +20,23 @@ def get_supabase() -> Client:
         return None
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ── Optimized AI Model Initialization (ONNX) ──────────────────────────────────
-# Using Optimum to convert and run the model via ONNX Runtime for CPU speedup.
+# ── Stable PyTorch Model Initialization ──────────────────────────────────────
+# Using the fine-tuned security model on the standard PyTorch engine
 HF_MODEL = "ProtectAI/deberta-v3-base-prompt-injection-v2"
 
-print(f"[PurifAI] Initializing ONNX inference pipeline: {HF_MODEL}")
+print(f"[PurifAI] Initializing Stable PyTorch pipeline: {HF_MODEL}")
 try:
-    # 1. Load the tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(HF_MODEL)
-    
-    # 2. Load and Export to ONNX (on-the-fly)
-    # This might take a moment on the first boot in the Space
-    model = ORTModelForSequenceClassification.from_pretrained(HF_MODEL, export=True)
-    
-    # 3. Create the optimized pipeline
+    # We bypass ONNX and load directly into the stable transformer pipeline
     classifier = pipeline(
         "text-classification", 
-        model=model, 
-        tokenizer=tokenizer
+        model=HF_MODEL, 
+        tokenizer=HF_MODEL,
+        truncation=True,
+        max_length=512
     )
-    print("[PurifAI] ONNX Runtime Engine loaded successfully.")
+    print("[PurifAI] Stable PyTorch Engine loaded successfully.")
 except Exception as e:
-    print(f"[PurifAI] CRITICAL: Failed to load ONNX model: {e}")
+    print(f"[PurifAI] CRITICAL: Failed to load PyTorch model: {e}")
     classifier = None
 
 # ── Regexes ──────────────────────────────────────────────────────────────────
@@ -56,33 +50,40 @@ HIGH_DANGER_REGEX = re.compile(
     re.IGNORECASE
 )
 
-# ── Optimized Inference Logic ────────────────────────────────────────────────
+# ── Stable Inference Logic ────────────────────────────────────────────────
 def query_huggingface(text: str):
     """
-    Runs inference locally using the ONNX-optimized DeBERTa v3 model.
+    Runs inference locally using the stable PyTorch DeBERTa v3 model.
     """
     if classifier is None:
         return {"error": "Model not loaded", "warming_up": False}
 
     try:
-        # Run inference with strict truncation to 512 tokens
+        # Run inference with strict truncation
         results = classifier(text, truncation=True, max_length=512)
         
         if isinstance(results, list) and len(results) > 0:
-            formatted = {}
-            for res in results:
-                if isinstance(res, dict):
-                    formatted[res["label"]] = res["score"]
+            prediction = results[0]
+            label = prediction['label']
+            score = prediction['score']
             
-            # Compatibility padding
-            if "SAFE" not in formatted: formatted["SAFE"] = 0.0
-            if "INJECTION" not in formatted: formatted["INJECTION"] = 0.0
+            # --- The 85% Confidence Threshold ---
+            # If the AI thinks it's an injection but isn't 85% sure, force it to SAFE
+            CONFIDENCE_THRESHOLD = 0.85
+            if label == "INJECTION" and score < CONFIDENCE_THRESHOLD:
+                print(f"[PurifAI] Overriding INJECTION ({score:.2f}) to SAFE due to low confidence.")
+                label = "SAFE"
+                
+            formatted = {
+                label: score,
+                "SAFE" if label == "INJECTION" else "INJECTION": 1.0 - score 
+            }
             
             return formatted
         
         return {"error": "Inference returned empty results"}
     except Exception as e:
-        print(f"[PurifAI] ONNX inference error: {str(e)}")
+        print(f"[PurifAI] PyTorch inference error: {str(e)}")
         return {"error": str(e)}
 
 # ── Text Processing Helpers ──────────────────────────────────────────────────

@@ -1,22 +1,17 @@
-# PurifAI Backend — Serverless Dependencies
-
 # Core API
-fastapi>=0.115.0
-uvicorn[standard]>=0.32.0
-pydantic>=2.0
+fastapi
+uvicorn[standard]
+pydantic
 
 # API Clients
-requests>=2.31.0
-supabase>=2.0.0
+requests
+supabase
 
 # PDF / File scanning
-pypdf>=4.0.0
-python-multipart>=0.0.9
+pypdf
+python-multipart
 
-# Utilities
-# hashlib, os, datetime, uuid — stdlib
-
-# AI / ML Local Inference
-transformers>=4.40.0
+# AI / ML Local Inference (CPU Optimized)
+transformers
 torch --index-url https://download.pytorch.org/whl/cpu
-optimum[onnxruntime]>=1.19.0
+optimum[onnxruntime]
