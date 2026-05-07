@@ -71,7 +71,7 @@ Experience the full serverless architecture without running local scripts.
 
 1. **Access the Dashboard:** Open the Command Center at [this link](https://purifai-cleaner.vercel.app).
     
-2. **I- **Install the Shield:** Download the latest compiled `purifai.crx` directly from our [GitHub Releases]([https://www.google.com/search?q=https://github.com/your-username/purifai/releases&authuser=2](https://github.com/HitsukiMok/PurifAI/releases)) page.
+2. **I- **Install the Shield:** Download the latest compiled `purifai-extensionv1.crx` directly from our [GitHub Releases]([https://www.google.com/search?q=https://github.com/your-username/purifai/releases&authuser=2](https://github.com/HitsukiMok/PurifAI/releases)) page.
     
     - Open Google Chrome and navigate to `chrome://extensions/`.
         
@@ -122,7 +122,7 @@ For large document processing, PurifAI utilizes two proprietary extraction algor
 2. **Head-and-Tail Extraction (DOM):** Attackers often append prompt injections at the very bottom of long, seemingly innocent email threads. Instead of blindly truncating long emails, our extension specifically extracts the first 1500 and last 1500 characters, ensuring the true payload is always captured while keeping processing times low.
     
 
-To know more about the architecture of the application, you can take a look at our [technical dive about it](https://www.google.com/search?q=TECHNICAL-DETAILS.md&authuser=2).
+To know more about the architecture of the application, you can take a look at our [technical dive about it](TECHNICAL-DETAILS.md).
 
 ---
 
