@@ -180,4 +180,3 @@ async def feedback_stats():
         count = sum(1 for _ in reader)
 
     return {"total_reports": count, "csv_file": CSV_FILE}
-
