@@ -17,7 +17,7 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Command Center — AgentShield Platform" },
+      { title: "PurifAI Platform — AI Agent Security Command Center" },
       {
         name: "description",
         content:

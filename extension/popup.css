@@ -116,22 +116,14 @@ html.light .ext-header { background: rgba(240, 242, 250, 0.9); }
 .ext-logo {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
-.ext-logo-icon {
-  width: 28px;
-  height: 28px;
-  background: var(--cyan-dim);
-  border: 1px solid var(--cyan);
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 0 12px var(--cyan-glow);
+.ext-logo-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
-
-.ext-logo-icon svg { width: 14px; height: 14px; color: var(--cyan); fill: none; stroke: var(--cyan); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 .ext-logo-text { line-height: 1.1; }
 .ext-logo-name { font-size: 12px; font-weight: 700; letter-spacing: -0.01em; color: var(--fg); }

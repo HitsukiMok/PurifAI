@@ -46,7 +46,10 @@ export const Route = createRootRoute({
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "icon", type: "image/png", href: "/favicon.png" },
+      { rel: "stylesheet", href: appCss }
+    ],
   }),
   shellComponent: RootShell,
   component: RootComponent,
