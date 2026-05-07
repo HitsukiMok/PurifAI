@@ -21,4 +21,9 @@ async def get_metrics():
             "blocked": total_blocked
         }
     except Exception as e:
-        return {"scanned": 0, "blocked": 0, "error": str(e)}
+        return {
+            "scanned": 0, 
+            "blocked": 0, 
+            "db_error": str(e),
+            "tip": "Ensure your Supabase project is active and 'scans' table exists."
+        }

@@ -27,17 +27,19 @@ async def scan_text(request: ScanRequest, http_request: Request):
     if isinstance(hf_result, dict) and hf_result.get("warming_up"):
         return hf_result
 
-    # 3. Process Predictions
+    # 3. Process Predictions (Calibrated Threshold)
+    # Increase threshold to 0.8 to avoid false positives on ambiguous text
     injection_score = hf_result.get("INJECTION", 0.0)
     safe_score = hf_result.get("SAFE", 0.0)
     
-    is_safe = safe_score > injection_score
+    # Innocent until proven guilty: requires high confidence to block
+    is_safe = injection_score < 0.8
     label = "SAFE" if is_safe else "INJECTION"
     confidence = safe_score if is_safe else injection_score
     
     heuristic_applied = "None"
     
-    # 4. Heuristics (Downgrade Logic)
+    # 4. Heuristics (Whitelist Logic)
     if not is_safe:
         has_high_danger = HIGH_DANGER_REGEX.search(cleaned_text) is not None
         if has_high_danger:
@@ -53,18 +55,19 @@ async def scan_text(request: ScanRequest, http_request: Request):
     # 5. Log to Supabase (Crash-Proof)
     try:
         supabase = get_supabase()
-        supabase.table("scans").insert({
-            "id": str(uuid.uuid4()),
+        log_data = {
             "timestamp": datetime.now().isoformat(),
-            "text": raw_text[:500], # Truncate for DB storage efficiency
+            "text": raw_text[:500],
             "label": label,
             "confidence": float(confidence),
             "is_safe": is_safe,
             "heuristic": heuristic_applied,
             "source": "extension-scan"
-        }).execute()
+        }
+        supabase.table("scans").insert(log_data).execute()
     except Exception as e:
-        print(f"Supabase logging failed: {e}")
+        # This will show up in your Vercel logs
+        print(f"CRITICAL: Supabase logging failed. Check if table 'scans' has columns: {list(log_data.keys())}. Error: {e}")
 
     return {
         "text": raw_text,
