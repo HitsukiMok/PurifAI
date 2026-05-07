@@ -155,6 +155,12 @@
       </div>
     </header>
 
+    <!-- Dashboard Tabs -->
+    <div class="ext-dash-tabs">
+      <button class="ext-dash-tab active" data-dash-tab="live-traffic">Live Traffic</button>
+      <button class="ext-dash-tab" data-dash-tab="file-scanner">File Scanner</button>
+    </div>
+
     <!-- User dropdown -->
     <div class="ext-user-dropdown hidden" id="user-dropdown">
       <div class="ext-user-info">
@@ -171,8 +177,9 @@
       </button>
     </div>
 
-    <!-- ── URL bar ── -->
-    <div class="ext-url-bar">
+    <div id="view-live-traffic" class="dash-view">
+      <!-- ── URL bar ── -->
+      <div class="ext-url-bar">
       <span id="url-dot" class="dot" style="background:var(--amber)"></span>
       <span id="url-text" class="not-connected">Not connected to PurifAI Dashboard</span>
     </div>
@@ -254,6 +261,42 @@
       </div>
       <pre class="ext-payload-pre" id="inspect-payload">—</pre>
     </div>
+    </div> <!-- /view-live-traffic -->
+
+    <!-- ── File Scanner View ── -->
+    <div id="view-file-scanner" class="dash-view hidden">
+      <div class="ext-scanner-wrap">
+        <div class="ext-scanner-hdr">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          Scan Document (.pdf, .txt)
+        </div>
+        
+        <div class="ext-dropzone" id="scanner-dropzone">
+          <input type="file" id="scanner-file-input" accept=".pdf,.txt" hidden />
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div class="drop-text" id="drop-text">Drag & drop or click to upload</div>
+          <div class="drop-sub">Max 2MB.</div>
+        </div>
+
+        <button class="ext-scan-btn" id="scanner-btn" disabled>
+          Scan File
+        </button>
+
+        <div class="ext-scan-error hidden" id="scanner-error"></div>
+
+        <div class="ext-scan-result hidden" id="scanner-result">
+          <div class="result-hdr">
+            <span id="res-badge" class="res-badge">—</span>
+            <span id="res-conf" class="res-conf">—</span>
+          </div>
+          <div id="res-text-wrap" class="hidden">
+            <div class="res-text-lbl">Detected payload:</div>
+            <pre class="res-text-pre" id="res-text"></pre>
+          </div>
+          <div id="res-note" class="res-note hidden"></div>
+        </div>
+      </div>
+    </div> <!-- /view-file-scanner -->
 
     <!-- ── Footer ── -->
     <div class="ext-footer">

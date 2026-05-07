@@ -140,39 +140,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       sendResponse({ ok: true });
     }
 
-    else if (msg.type === "PURIFAI_SCAN_FILE_REQUEST") {
-      // Fetch the file blob, then send as multipart/form-data to /api/scan-file
-      fetch(msg.fileUrl)
-        .then((r) => {
-          if (!r.ok) throw new Error(`Failed to fetch file: HTTP ${r.status}`);
-          return r.blob();
-        })
-        .then((blob) => {
-          const formData = new FormData();
-          formData.append("file", blob, msg.filename || "attachment.pdf");
-          return fetch(`${API_BASE}/api/scan-file`, {
-            method: "POST",
-            body: formData,
-          });
-        })
-        .then((r) => {
-          if (!r.ok) return Promise.reject({ status: r.status, message: `HTTP Error ${r.status}` });
-          return r.json();
-        })
-        .then((data) => {
-          // Log to dashboard if injection found
-          if (data && !data.is_safe) {
-            handleScanResult({
-              text: data.malicious_text || data.filename,
-              is_safe: false,
-              confidence: data.confidence,
-              label: data.label,
-            }, sender);
-          }
-          sendResponse({ ok: true, data });
-        })
-        .catch((err) => sendResponse({ ok: false, error: err.message || "Unknown error", status: err.status }));
-    }
+
 
     else if (msg.type === "GET_STATE") {
       sendResponse(state);
@@ -182,79 +150,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true; // keep channel open
 });
 
-// ── Download Intercept for PDF/TXT files ────────────────────────────────────
-// Pauses downloads of .pdf/.txt from Gmail, scans them, cancels if malicious.
-chrome.downloads.onDeterminingFilename.addListener((downloadItem, suggest) => {
-  const filename = downloadItem.filename || "";
-  const ext = filename.split('.').pop().toLowerCase();
-  const fromGmail = (downloadItem.referrer || "").includes("mail.google.com") ||
-                    (downloadItem.url || "").includes("mail.google.com");
 
-  if (!fromGmail || !['pdf', 'txt'].includes(ext)) {
-    suggest({ filename: downloadItem.filename });
-    return;
-  }
-
-  // Suggest filename to keep the download alive
-  suggest({ filename: downloadItem.filename });
-
-  // Notify content script: show Glass Shield
-  if (downloadItem.tabId) {
-    chrome.tabs.sendMessage(downloadItem.tabId, {
-      type: "PURIFAI_FILE_SCANNING",
-      data: { filename: filename },
-    }).catch(() => {});
-  }
-
-  // Fetch the file and scan it
-  fetch(downloadItem.url)
-    .then((r) => r.blob())
-    .then((blob) => {
-      const formData = new FormData();
-      formData.append("file", blob, filename);
-      return fetch(`${API_BASE}/api/scan-file`, {
-        method: "POST",
-        body: formData,
-      });
-    })
-    .then((r) => {
-      if (!r.ok) return null; // Let download proceed if backend is down
-      return r.json();
-    })
-    .then((data) => {
-      if (data && !data.is_safe) {
-        // Cancel the malicious download
-        chrome.downloads.cancel(downloadItem.id);
-        chrome.downloads.erase({ id: downloadItem.id });
-
-        // Notify content script about the blocked file
-        if (downloadItem.tabId) {
-          chrome.tabs.sendMessage(downloadItem.tabId, {
-            type: "PURIFAI_FILE_BLOCKED",
-            data: data,
-          }).catch(() => {});
-        }
-      } else {
-        // Safe — remove the Glass Shield
-        if (downloadItem.tabId) {
-          chrome.tabs.sendMessage(downloadItem.tabId, {
-            type: "PURIFAI_FILE_SCAN_DONE",
-          }).catch(() => {});
-        }
-      }
-    })
-    .catch((err) => {
-      console.warn("[PurifAI] Download intercept failed, allowing download:", err);
-      // Remove shield on error too
-      if (downloadItem.tabId) {
-        chrome.tabs.sendMessage(downloadItem.tabId, {
-          type: "PURIFAI_FILE_SCAN_DONE",
-        }).catch(() => {});
-      }
-    });
-
-  return true; // Indicates async handling
-});
 
 function handleScanResult(scan, sender) {
 

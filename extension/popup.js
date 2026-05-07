@@ -405,3 +405,177 @@ function escHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DASHBOARD TABS & FILE SCANNER
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Tab Switching ──────────────────────────────────────────────────────────
+const dashTabs = document.querySelectorAll('.ext-dash-tab');
+const dashViews = document.querySelectorAll('.dash-view');
+
+dashTabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    const target = tab.getAttribute('data-dash-tab');
+    
+    dashTabs.forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    
+    dashViews.forEach(view => {
+      if (view.id === `view-${target}`) {
+        view.classList.remove('hidden');
+      } else {
+        view.classList.add('hidden');
+      }
+    });
+  });
+});
+
+// ── File Scanner Logic ─────────────────────────────────────────────────────
+const dropzone = document.getElementById('scanner-dropzone');
+const fileInput = document.getElementById('scanner-file-input');
+const dropText = document.getElementById('drop-text');
+const scanBtn = document.getElementById('scanner-btn');
+const scanError = document.getElementById('scanner-error');
+const scanResult = document.getElementById('scanner-result');
+const resBadge = document.getElementById('res-badge');
+const resConf = document.getElementById('res-conf');
+const resTextWrap = document.getElementById('res-text-wrap');
+const resText = document.getElementById('res-text');
+const resNote = document.getElementById('res-note');
+
+let selectedFile = null;
+
+function handleFileSelect(file) {
+  scanError.classList.add('hidden');
+  scanResult.classList.add('hidden');
+  
+  if (!file) {
+    selectedFile = null;
+    dropText.textContent = "Drag & drop or click to upload";
+    dropzone.classList.remove('has-file');
+    scanBtn.disabled = true;
+    return;
+  }
+  
+  // Validate type
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext !== 'pdf' && ext !== 'txt') {
+    scanError.textContent = "Unsupported file type. Only .pdf and .txt are allowed.";
+    scanError.classList.remove('hidden');
+    selectedFile = null;
+    dropText.textContent = "Drag & drop or click to upload";
+    dropzone.classList.remove('has-file');
+    scanBtn.disabled = true;
+    return;
+  }
+  
+  // Validate size (2MB = 2 * 1024 * 1024 bytes)
+  if (file.size > 2 * 1024 * 1024) {
+    scanError.textContent = "File too large. Max size is 2MB for the MVP.";
+    scanError.classList.remove('hidden');
+    selectedFile = null;
+    dropText.textContent = "Drag & drop or click to upload";
+    dropzone.classList.remove('has-file');
+    scanBtn.disabled = true;
+    return;
+  }
+  
+  selectedFile = file;
+  dropText.textContent = file.name;
+  dropzone.classList.add('has-file');
+  scanBtn.disabled = false;
+}
+
+// Click to upload
+if (dropzone && fileInput) {
+  dropzone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (e) => {
+    handleFileSelect(e.target.files[0]);
+  });
+}
+
+// Drag and drop
+if (dropzone) {
+  dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  });
+  dropzone.addEventListener('dragleave', () => {
+    dropzone.classList.remove('dragover');
+  });
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileSelect(e.dataTransfer.files[0]);
+    }
+  });
+}
+
+// Scan Execution
+if (scanBtn) {
+  scanBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    
+    // UI Loading state
+    scanBtn.disabled = true;
+    scanBtn.innerHTML = '<span class="purifai-glass-spinner" style="width:14px;height:14px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px"></span> Scanning... (This may take a moment)';
+    scanError.classList.add('hidden');
+    scanResult.classList.add('hidden');
+    
+    const formData = new FormData();
+    formData.append("file", selectedFile, selectedFile.name);
+    
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/scan-file", {
+        method: "POST",
+        body: formData
+      });
+      
+      if (response.status === 429) {
+        scanError.textContent = "Scan unavailable (Server Busy). Please wait 10 seconds and try again.";
+        scanError.classList.remove('hidden');
+        scanBtn.innerHTML = 'Scan File';
+        scanBtn.disabled = false;
+        return;
+      }
+      
+      if (!response.ok) {
+        throw new Error(`HTTP Error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Render results
+      scanResult.classList.remove('hidden');
+      
+      if (data.is_safe) {
+        resBadge.textContent = "Safe";
+        resBadge.className = "res-badge safe";
+        resConf.textContent = data.confidence ? `Confidence: ${(data.confidence*100).toFixed(1)}%` : "";
+        resTextWrap.classList.add('hidden');
+      } else {
+        resBadge.textContent = "Injection Detected";
+        resBadge.className = "res-badge danger";
+        resConf.textContent = data.confidence ? `Confidence: ${(data.confidence*100).toFixed(1)}%` : "";
+        resTextWrap.classList.remove('hidden');
+        resText.textContent = data.malicious_text || "Malicious text identified in payload.";
+      }
+      
+      if (data.partial_scan) {
+        resNote.textContent = data.note || "Only partial content was scanned due to length limits.";
+        resNote.classList.remove('hidden');
+      } else {
+        resNote.classList.add('hidden');
+      }
+      
+    } catch (err) {
+      scanError.textContent = "Failed to connect to PurifAI backend. Ensure the server is running.";
+      scanError.classList.remove('hidden');
+    } finally {
+      scanBtn.innerHTML = 'Scan File';
+      scanBtn.disabled = false;
+    }
+  });
+}
