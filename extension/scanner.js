@@ -147,6 +147,10 @@
       
       scanText(textToRetry).then(function(result) {
          isCurrentlyScanning = false;
+         // Remove the shield explicitly if safe, otherwise handle normally
+         if (result && result.is_safe === true) {
+             removeGlassShield(element);
+         }
          handleScanResponse(result, element, textToRetry);
       });
     });
@@ -157,6 +161,7 @@
       // Permanently dissolve Glass Shield for this thread
       var msgId = getMessageId(element) || currentEmailId;
       processedMessageIds.add(msgId);
+      hasScannedCurrentEmailId = true; // Prevent observer from re-triggering immediately
       
       removeGlassShield(element);
     });
@@ -534,7 +539,14 @@
     var mainElement = null;
 
     emailContainers.forEach(function (container) {
-      var text = container.innerText || "";
+      // Deep DOM Sanitization: Clone and strip styles/scripts
+      var clone = container.cloneNode(true);
+      var junks = clone.querySelectorAll('style, script');
+      for (var i = 0; i < junks.length; i++) {
+          junks[i].remove();
+      }
+      var text = clone.innerText || clone.textContent || "";
+      
       if (text.trim()) {
           combinedText += text.trim() + "\n";
           if (container.classList.contains('a3s')) {
