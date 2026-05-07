@@ -23,9 +23,20 @@ async def scan_text(request: ScanRequest, http_request: Request):
     # 1. Hugging Face Inference
     hf_result = query_huggingface(cleaned_text)
 
-    # 2. Handle Cold Start / Warming Up
+    # 2. Handle Cold Start / Warming Up / API Errors
     if isinstance(hf_result, dict) and hf_result.get("warming_up"):
         return hf_result
+
+    # 🚨 SAFETY NET: Handle HF Rate Limits or malformed responses
+    if not isinstance(hf_result, dict) or ("SAFE" not in hf_result and "INJECTION" not in hf_result):
+        print(f"Hugging Face Overload/Error: {hf_result}")
+        return {
+            "text": raw_text,
+            "is_safe": True, # Fail-open to protect user workflow
+            "label": "SAFE (API Bypass)",
+            "confidence": 0.0,
+            "heuristic": "HF API Rate Limited"
+        }
 
     # 3. Process Predictions (Calibrated Threshold)
     # Increase threshold to 0.8 to avoid false positives on ambiguous text

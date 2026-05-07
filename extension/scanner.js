@@ -580,8 +580,23 @@
     });
   }
 
-  var observer = new MutationObserver(function (mutations) {
-    var newEmailId = window.location.hash;
+    var observer = new MutationObserver(function (mutations) {
+      // 🚨 INFINITE LOOP PROTECTION: Completely ignore mutations on our own UI
+      for (let i = 0; i < mutations.length; i++) {
+        const m = mutations[i];
+        const target = m.target;
+        if (target.nodeType === Node.ELEMENT_NODE) {
+          if (target.classList.contains('purifai-shield') || target.closest('[class*="purifai-"]')) {
+            return; // Bail out entirely for this batch
+          }
+        } else if (target.parentNode && target.parentNode.nodeType === Node.ELEMENT_NODE) {
+          if (target.parentNode.closest('[class*="purifai-"]')) {
+            return; // Bail out
+          }
+        }
+      }
+
+      var newEmailId = window.location.hash;
     if (newEmailId !== currentEmailId) {
       currentEmailId = newEmailId;
       hasTriggeredDanger = false;
