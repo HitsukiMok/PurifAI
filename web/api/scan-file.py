@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException, UploadFile, File
+from fastapi import APIRouter, Request, HTTPException, UploadFile, File
 import io
 import uuid
 import re
@@ -10,12 +10,12 @@ from .utils import (
     MARKETING_REGEX, get_supabase, chunk_text
 )
 
-app = FastAPI()
+router = APIRouter()
 
 MAX_FILE_SIZE = 2 * 1024 * 1024  # 2 MB
 MAX_PDF_PAGES = 5
 
-@app.post("/api/scan-file")
+@router.post("/scan-file")
 async def scan_file(http_request: Request, file: UploadFile = File(...)):
     """Scan an uploaded PDF or TXT file for prompt injections."""
     

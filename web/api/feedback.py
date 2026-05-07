@@ -1,9 +1,9 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime
 from .utils import get_supabase
 
-app = FastAPI()
+router = APIRouter()
 
 class FeedbackRequest(BaseModel):
     text: str                    # The original text that was scanned
@@ -11,7 +11,7 @@ class FeedbackRequest(BaseModel):
     model_confidence: float      # How confident the AI was (0.0 - 1.0)
     user_corrected_label: str    # What the user says it SHOULD be (SAFE or INJECTION)
 
-@app.post("/api/feedback")
+@router.post("/feedback")
 async def log_feedback(feedback: FeedbackRequest):
     """
     Logs feedback to Supabase 'feedback' table.

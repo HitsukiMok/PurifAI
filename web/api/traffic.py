@@ -1,10 +1,10 @@
-from fastapi import FastAPI, Request
+from fastapi import APIRouter, Request
 from .utils import get_supabase
 from datetime import datetime
 
-app = FastAPI()
+router = APIRouter()
 
-@app.get("/api/traffic")
+@router.get("/traffic")
 async def traffic_scans(since: str = None):
     """
     Return scans newer than `since` (ISO format).

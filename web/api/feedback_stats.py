@@ -1,9 +1,9 @@
-from fastapi import FastAPI
+from fastapi import APIRouter
 from .utils import get_supabase
 
-app = FastAPI()
+router = APIRouter()
 
-@app.get("/api/feedback/stats")
+@router.get("/feedback/stats")
 async def feedback_stats():
     """
     Returns the total number of feedback reports from Supabase.
