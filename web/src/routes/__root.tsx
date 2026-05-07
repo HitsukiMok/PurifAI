@@ -34,14 +34,14 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "AgentShield Platform — AI Agent Security Command Center" },
+      { title: "PurifAI Platform — AI Agent Security Command Center" },
       {
         name: "description",
         content:
-          "AgentShield protects enterprise AI agents from indirect prompt injection attacks in emails, documents and tools.",
+          "PurifAI protects enterprise AI agents from indirect prompt injection attacks in emails, documents and tools.",
       },
-      { property: "og:title", content: "AgentShield Platform — AI Agent Security Command Center" },
-      { name: "twitter:title", content: "AgentShield Platform — AI Agent Security Command Center" },
+      { property: "og:title", content: "PurifAI Platform — AI Agent Security Command Center" },
+      { name: "twitter:title", content: "PurifAI Platform — AI Agent Security Command Center" },
       { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ac323b2d-c57f-452e-9530-da08a3e7533f/id-preview-aa5c1e94--6a4ca9a3-c868-4256-9f32-3c041c0503af.lovable.app-1777971971347.png" },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
@@ -189,14 +189,14 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
           <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border/40 bg-background/80 px-3 backdrop-blur sm:gap-3 sm:px-4">
             <SidebarTrigger />
             <div className="flex min-w-0 items-center gap-2">
-              <span className="truncate text-sm font-semibold tracking-tight">AgentShield Platform</span>
+              <span className="truncate text-sm font-semibold tracking-tight">PurifAI Platform</span>
               <span className="hidden text-[10px] uppercase tracking-[0.18em] text-muted-foreground sm:inline whitespace-nowrap">
                 / Command Center
               </span>
             </div>
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
               <span className="hidden items-center gap-1.5 rounded-full border border-border/60 bg-card px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground md:inline-flex">
-                Production
+                ShotbuPullers
               </span>
               <div className="hidden items-center gap-2 rounded-full border border-success/30 bg-success/10 px-3 py-1 sm:flex">
                 <span className="pulse-dot h-2 w-2 rounded-full bg-success" />

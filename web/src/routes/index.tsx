@@ -1,15 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bot, ScanSearch, ShieldX, Zap } from "lucide-react";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { LiveTrafficTable } from "@/components/dashboard/LiveTrafficTable";
 import { AttackInspectionPanel } from "@/components/dashboard/AttackInspectionPanel";
 import { ExtensionSection } from "@/components/dashboard/ExtensionSection";
 import { useExtensionBridge } from "@/hooks/use-extension-bridge";
-import { useBackendPolling } from "@/hooks/use-backend-polling";
 import {
   initialAttack,
+  initialRows,
   makeAttackRow,
+  makeCleanRow,
   type TrafficRow,
 } from "@/lib/mock-traffic";
 
@@ -28,48 +29,37 @@ export const Route = createFileRoute("/")({
 });
 
 function Dashboard() {
-  // Real-time data from the backend
-  const { realRows, realMetrics, backendOnline } = useBackendPolling();
-
-  // Combined state: real rows from backend + simulated demo rows
-  const [demoRows, setDemoRows] = useState<TrafficRow[]>([]);
-  const [demoBlocked, setDemoBlocked] = useState(0);
-  const [demoScanned, setDemoScanned] = useState(0);
-
-  // Combine real + demo rows, real rows first
-  const allRows = [...realRows, ...demoRows].slice(0, 50);
-
-  // Metrics: real from backend + demo additions
-  const scanned = realMetrics.scanned + demoScanned;
-  const blocked = realMetrics.blocked + demoBlocked;
-  const agents = 1; // PurifAI Scanner
-
+  const [rows, setRows] = useState<TrafficRow[]>([initialAttack, ...initialRows]);
+  const [scanned, setScanned] = useState(48217);
+  const [blocked, setBlocked] = useState(127);
+  const [agents] = useState(34);
   const [selected, setSelected] = useState<TrafficRow>(initialAttack);
-  const [newestId, setNewestId] = useState<string | undefined>(undefined);
+  const [newestId, setNewestId] = useState<string | undefined>(initialAttack.id);
   const [blockedPulse, setBlockedPulse] = useState(0);
   const [showPanel, setShowPanel] = useState(false);
+  const tickRef = useRef<number | null>(null);
 
-  // Auto-select the newest blocked row when real data comes in
+  // ── Extension bridge — broadcasts live data to the Chrome extension ──
+  const { extensionConnected } = useExtensionBridge(rows, { scanned, blocked, agents });
+
+  // Background ticker — adds clean rows so the feed feels alive.
   useEffect(() => {
-    if (realRows.length > 0) {
-      const latestBlocked = realRows.find((r) => r.status === "Blocked");
-      if (latestBlocked) {
-        setSelected(latestBlocked);
-        setShowPanel(true);
-        setBlockedPulse((p) => p + 1);
-      }
-      setNewestId(realRows[0].id);
-    }
-  }, [realRows]);
-
-  // Extension bridge — broadcasts live data to the Chrome extension popup
-  const { extensionConnected } = useExtensionBridge(allRows, { scanned, blocked, agents });
+    tickRef.current = window.setInterval(() => {
+      const r = makeCleanRow();
+      setRows((prev) => [r, ...prev].slice(0, 40));
+      setNewestId(r.id);
+      setScanned((s) => s + 1 + Math.floor(Math.random() * 3));
+    }, 3500);
+    return () => {
+      if (tickRef.current) window.clearInterval(tickRef.current);
+    };
+  }, []);
 
   function simulateAttack() {
     const a = makeAttackRow();
-    setDemoRows((prev) => [a, ...prev].slice(0, 40));
-    setDemoBlocked((b) => b + 1);
-    setDemoScanned((s) => s + 1);
+    setRows((prev) => [a, ...prev].slice(0, 40));
+    setBlocked((b) => b + 1);
+    setScanned((s) => s + 1);
     setSelected(a);
     setNewestId(a.id);
     setBlockedPulse((p) => p + 1);
@@ -77,33 +67,28 @@ function Dashboard() {
   }
 
   function handleSelect(r: TrafficRow) {
-    setSelected(r);
-    setShowPanel(true);
+    if (r.status === "Blocked") {
+      setSelected(r);
+      setShowPanel(true);
+    }
   }
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      <div className="mx-auto max-w-[1500px] space-y-4 p-3 sm:space-y-5 sm:p-4 md:p-6">
-        {/* Backend status indicator */}
-        {!backendOnline && (
-          <div className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-2 text-xs text-danger">
-            ⚠️ Backend offline — start <code>uvicorn main:app --reload</code> in <code>backend/</code>
-          </div>
-        )}
-
+      <div className="mx-au to max-w-[1500px] space-y-4 p-3 sm:space-y-5 sm:p-4 md:p-6">
         {/* Top row: metrics + CTA */}
         <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-[1fr_1fr_1fr_auto]">
           <MetricCard
             label="AI Ingestions Scanned"
             value={scanned.toLocaleString()}
-            delta={backendOnline ? "● live" : "○ offline"}
+            delta="↑ 2.4% last hour"
             icon={ScanSearch}
             tone="ai"
           />
           <MetricCard
             label="Prompt Injections Blocked"
             value={blocked.toLocaleString()}
-            delta="real-time"
+            delta="last 24h"
             icon={ShieldX}
             tone="danger"
             pulseKey={blockedPulse}
@@ -111,7 +96,7 @@ function Dashboard() {
           <MetricCard
             label="Active AI Agents Protected"
             value={agents}
-            delta="PurifAI Scanner"
+            delta="across 7 workspaces"
             icon={Bot}
             tone="success"
           />
@@ -144,7 +129,7 @@ function Dashboard() {
         <section className="grid gap-4 lg:grid-cols-5">
           <div className="lg:col-span-3 min-h-[400px] sm:min-h-[480px] lg:min-h-[520px]">
             <LiveTrafficTable
-              rows={allRows}
+              rows={rows}
               newestId={newestId}
               onSelect={handleSelect}
               selectedId={selected.id}
