@@ -1,13 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Import your separated route files using explicit relative imports
-from .scan import router as scan_router
-from .scan_file import router as scan_file_router
-from .traffic import router as traffic_router
-from .metrics import router as metrics_router
-from .feedback import router as feedback_router
-from .feedback_stats import router as feedback_stats_router
+# 🧪 Isolation Test: Temporarily comment out sub-routers
+# from .scan import router as scan_router
+# from .scan_file import router as scan_file_router
+# from .traffic import router as traffic_router
+# from .metrics import router as metrics_router
+# from .feedback import router as feedback_router
+# from .feedback_stats import router as feedback_stats_router
 
 app = FastAPI(title="PurifAI API")
 
@@ -20,14 +20,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include the routers
-app.include_router(scan_router, prefix="/api")
-app.include_router(scan_file_router, prefix="/api")
-app.include_router(traffic_router, prefix="/api")
-app.include_router(metrics_router, prefix="/api")
-app.include_router(feedback_router, prefix="/api")
-app.include_router(feedback_stats_router, prefix="/api")
+# Include the routers (Commented out for isolation test)
+# app.include_router(scan_router, prefix="/api")
+# app.include_router(scan_file_router, prefix="/api")
+# app.include_router(traffic_router, prefix="/api")
+# app.include_router(metrics_router, prefix="/api")
+# app.include_router(feedback_router, prefix="/api")
+# app.include_router(feedback_stats_router, prefix="/api")
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "ok", "deployment": "vercel-serverless"}
+    return {"status": "alive", "message": "Vercel Python is working!"}
