@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
@@ -9,6 +9,7 @@ import re
 import hashlib
 import functools
 from datetime import datetime
+import time
 
 import logging
 
@@ -74,15 +75,34 @@ def cached_inference(text_hash: str, cleaned_text: str):
 class ScanRequest(BaseModel):
     text: str
 
+CLIENT_RATE_LIMITS = {}
+
 @app.post("/api/scan")
-async def scan_text(request: ScanRequest):
+async def scan_text(request: ScanRequest, http_request: Request):
+    # Rate Limiting: Max 1 scan per 2 seconds per IP
+    client_ip = http_request.client.host
+    now = time.time()
+    last_scan = CLIENT_RATE_LIMITS.get(client_ip, 0)
+    
+    if now - last_scan < 2:
+        logger.warning(f"Rate limit exceeded for IP {client_ip}")
+        raise HTTPException(status_code=429, detail="Too Many Requests", headers={"Retry-After": "2"})
+        
+    CLIENT_RATE_LIMITS[client_ip] = now
+
     logger.info(f"Received scan request. Length: {len(request.text)} chars")
     try:
         # 1. HTML Stripping for cleaner inference
         cleaned_text = re.sub(r'<[^>]+>', ' ', request.text).strip()
         
+        # 1b. Fuzzy Deduplication: Strip volatile timestamps and headers
+        fuzzy_text = re.sub(r'On\s+(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun).*?wrote:', '', cleaned_text, flags=re.IGNORECASE)
+        fuzzy_text = re.sub(r'\d{1,2}:\d{2}\s*(?:AM|PM)?', '', fuzzy_text, flags=re.IGNORECASE)
+        fuzzy_text = re.sub(r'\d{4}-\d{2}-\d{2}', '', fuzzy_text)
+        fuzzy_text = fuzzy_text.strip()
+        
         # 2. Caching via SHA-256
-        text_hash = hashlib.sha256(cleaned_text.encode('utf-8')).hexdigest()
+        text_hash = hashlib.sha256(fuzzy_text.encode('utf-8')).hexdigest()
         
         # 3. Model Inference (cached)
         prediction = cached_inference(text_hash, cleaned_text)

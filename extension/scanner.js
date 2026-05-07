@@ -33,7 +33,7 @@
             }
             if (!response || !response.ok) {
               console.warn("[PurifAI] Bad response:", response);
-              resolve(null);
+              resolve(response || { error: true });
               return;
             }
             console.log("[PurifAI] Scan result:", response.data);
@@ -95,6 +95,88 @@
     // Fallback if no message ID exists (e.g., subject line)
     var text = element.textContent || element.innerText || "";
     return text.trim().substring(0, 40);
+  }
+
+  // ── UI: Glass Shield (Optimistic Lock) ────────────────────────────────────
+  function showGlassShield(element) {
+    if (element.querySelector('.purifai-glass-shield')) return;
+    element.style.position = "relative";
+    var shield = document.createElement("div");
+    shield.className = "purifai-glass-shield";
+    shield.innerHTML = '<div class="purifai-glass-spinner"></div><div>PurifAI: Scanning...</div>';
+    
+    // Prevent clicks from reaching the email
+    shield.addEventListener('click', function(e) { e.stopPropagation(); e.preventDefault(); }, true);
+    
+    element.appendChild(shield);
+  }
+
+  function removeGlassShield(element) {
+    var shield = element.querySelector('.purifai-glass-shield');
+    if (shield) shield.remove();
+  }
+
+  function showGlassShieldWarning(element, textToRetry) {
+    var shield = element.querySelector('.purifai-glass-shield');
+    if (!shield) {
+        showGlassShield(element);
+        shield = element.querySelector('.purifai-glass-shield');
+    }
+    
+    shield.classList.add('purifai-glass-shield-warning');
+    shield.innerHTML = `
+      <div style="font-size:24px">⚠️</div>
+      <div>Scan unavailable (Server Busy). Proceed with caution.</div>
+      <div class="purifai-glass-btn-group">
+        <button class="purifai-glass-btn purifai-glass-btn-retry">Retry Scan</button>
+        <button class="purifai-glass-btn purifai-glass-btn-proceed">Read Anyway</button>
+      </div>
+    `;
+
+    var retryBtn = shield.querySelector('.purifai-glass-btn-retry');
+    var proceedBtn = shield.querySelector('.purifai-glass-btn-proceed');
+
+    retryBtn.addEventListener('click', function(e) {
+      e.stopPropagation(); e.preventDefault();
+      shield.classList.remove('purifai-glass-shield-warning');
+      shield.innerHTML = '<div class="purifai-glass-spinner"></div><div>PurifAI: Scanning...</div>';
+      
+      scanText(textToRetry).then(function(result) {
+         handleScanResponse(result, element, textToRetry);
+      });
+    });
+
+    proceedBtn.addEventListener('click', function(e) {
+      e.stopPropagation(); e.preventDefault();
+      removeGlassShield(element);
+    });
+  }
+
+  function handleScanResponse(result, element, originalText) {
+    if (result && result.status === 429) {
+      showGlassShieldWarning(element, originalText);
+      return;
+    }
+    
+    if (!result || result.error) {
+      removeGlassShield(element);
+      console.warn("[PurifAI] Scan failed or returned error:", result);
+      return;
+    }
+
+    removeGlassShield(element);
+
+    var msgId = getMessageId(element);
+    if (!element.isContentEditable) {
+      processedMessageIds.add(msgId);
+    }
+
+    if (result.is_safe === false) {
+      hasTriggeredDanger = true;
+      showBlockingOverlay(element, result);
+    } else {
+      showSafe(element);
+    }
   }
 
   // ── UI: Show blocking overlay (full-screen confirmation popup) ────────────
@@ -393,26 +475,11 @@
     lastScannedText = trimmed;
 
     console.log("[PurifAI] Scanning text:", trimmed.substring(0, 80) + "...");
+    
+    showGlassShield(element);
 
     scanText(trimmed).then(function (result) {
-      if (!result || result.error) {
-        console.warn("[PurifAI] Scan failed or returned error:", result);
-        return;
-      }
-      
-      if (!element.isContentEditable) {
-          processedMessageIds.add(msgId);
-      }
-
-      if (result.is_safe === false) {
-        // Triggering the Latch
-        hasTriggeredDanger = true;
-        
-        // BLOCK with full overlay — not just a warning
-        showBlockingOverlay(element, result);
-      } else {
-        showSafe(element);
-      }
+      handleScanResponse(result, element, trimmed);
     });
   }
 
@@ -448,6 +515,7 @@
   // ── Gmail-Specific Observer for Email Bodies ──────────────────────────────
   let currentEmailId = null;
   let hasTriggeredDanger = false;
+  let isFirstScan = true;
 
   var observer = new MutationObserver(function (mutations) {
     // ── The Circuit Breaker: Short-Circuit Logic ──
@@ -455,6 +523,7 @@
     if (newEmailId !== currentEmailId) {
       currentEmailId = newEmailId;
       hasTriggeredDanger = false;
+      isFirstScan = true;
       removeActiveOverlay();
     }
 
@@ -472,13 +541,21 @@
 
     if (foundRelevantChange) {
       clearTimeout(mutationDebounce);
-      mutationDebounce = setTimeout(function () {
-        // Strict targeting: Message bodies and Subject lines
+      if (isFirstScan) {
+        isFirstScan = false;
         var emailContainers = document.querySelectorAll('.a3s.aiL, h2.hP');
         emailContainers.forEach(function (container) {
           handleInput(container);
         });
-      }, DEBOUNCE_MS);
+      } else {
+        mutationDebounce = setTimeout(function () {
+          // Strict targeting: Message bodies and Subject lines
+          var emailContainers = document.querySelectorAll('.a3s.aiL, h2.hP');
+          emailContainers.forEach(function (container) {
+            handleInput(container);
+          });
+        }, DEBOUNCE_MS);
+      }
     }
   });
 

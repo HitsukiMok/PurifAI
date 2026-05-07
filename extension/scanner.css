@@ -530,3 +530,70 @@
   background: rgba(248, 113, 113, 0.3);
   border-radius: 2px;
 }
+
+/* ── Glass Shield (Optimistic UI Block) ──────────────────────────────────── */
+.purifai-glass-shield {
+  position: absolute !important;
+  inset: 0 !important;
+  background: rgba(255, 255, 255, 0.4) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  z-index: 2147483645 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-family: 'Inter', system-ui, sans-serif !important;
+  color: #1f2937 !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  border-radius: 4px !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+
+.purifai-glass-shield-warning {
+  background: rgba(254, 243, 199, 0.9) !important; /* amber-100 */
+  color: #92400e !important; /* amber-900 */
+}
+
+.purifai-glass-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(0,0,0,0.1);
+  border-radius: 50%;
+  border-top-color: #3b82f6;
+  animation: purifai-spin 1s ease-in-out infinite;
+}
+
+@keyframes purifai-spin {
+  to { transform: rotate(360deg); }
+}
+
+.purifai-glass-btn-group {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.purifai-glass-btn {
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.purifai-glass-btn-retry {
+  background: #f59e0b;
+  color: white;
+}
+.purifai-glass-btn-retry:hover { background: #d97706; }
+
+.purifai-glass-btn-proceed {
+  background: rgba(0,0,0,0.1);
+  color: #92400e;
+}
+.purifai-glass-btn-proceed:hover { background: rgba(0,0,0,0.2); }
+
