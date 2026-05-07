@@ -3,7 +3,7 @@ from pydantic import BaseModel
 import time
 import uuid
 from datetime import datetime
-from .utils import (
+from utils import (
     query_huggingface, clean_text, HIGH_DANGER_REGEX, 
     MARKETING_REGEX, get_supabase, get_text_hash
 )

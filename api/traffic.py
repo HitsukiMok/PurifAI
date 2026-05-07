@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request
-from .utils import get_supabase
+from utils import get_supabase
 from datetime import datetime
 
 router = APIRouter()

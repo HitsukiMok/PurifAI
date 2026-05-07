@@ -5,7 +5,7 @@ import re
 import time
 from datetime import datetime
 from pypdf import PdfReader
-from .utils import (
+from utils import (
     query_huggingface, clean_text, HIGH_DANGER_REGEX, 
     MARKETING_REGEX, get_supabase, chunk_text
 )

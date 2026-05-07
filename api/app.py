@@ -6,20 +6,12 @@ import os
 # Import routers from the current package
 # Note: When running as a package (python -m api.app), use relative imports.
 # When running inside Docker where api/ is copied to root, use absolute or adjust.
-try:
-    from .scan import router as scan_router
-    from .scan_file import router as scan_file_router
-    from .traffic import router as traffic_router
-    from .metrics import router as metrics_router
-    from .feedback import router as feedback_router
-    from .feedback_stats import router as feedback_stats_router
-except ImportError:
-    from scan import router as scan_router
-    from scan_file import router as scan_file_router
-    from traffic import router as traffic_router
-    from metrics import router as metrics_router
-    from feedback import router as feedback_router
-    from feedback_stats import router as feedback_stats_router
+from scan import router as scan_router
+from scan_file import router as scan_file_router
+from traffic import router as traffic_router
+from metrics import router as metrics_router
+from feedback import router as feedback_router
+from feedback_stats import router as feedback_stats_router
 
 app = FastAPI(title="PurifAI API — Local Inference")
 
