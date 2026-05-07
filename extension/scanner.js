@@ -534,106 +534,73 @@
   }, true);
 
   // ── Gmail-Specific Observer for Email Bodies ──────────────────────────────
-  var currentEmailId = null;
-  var hasTriggeredDanger = false;
-  var hasScannedCurrentEmailId = false;
+  // 🚨 SINGLETON STATE: Prevent thread burst spam
+  let globalScanTimer = null;
+  let isFetching = false;
+  let currentEmailId = null;
+  let hasTriggeredDanger = false;
+  let hasScannedCurrentEmailId = false;
 
-  // 🚨 CIRCUIT BREAKER: Global state to prevent infinite loops
-  let scanTimeout = null;
-  let isCurrentlyScanning = false;
+  function executeScanCycle() {
+    if (isFetching || hasTriggeredDanger) return;
 
-  function doScan(emailContainers) {
+    // Step 2: Find all target containers
+    // We target .a3s (body) and h2.hP (subject)
+    var allPotential = document.querySelectorAll('.a3s.aiL:not([data-purifai-scanned]), h2.hP:not([data-purifai-scanned])');
+    
+    if (allPotential.length === 0) return;
+
+    // 🚨 SINGLETON RULE: Only target the LAST (newest) element to avoid burst spam
+    var targetNode = allPotential[allPotential.length - 1];
+    
+    // Step 3: Lock the node instantly
+    isFetching = true;
+    targetNode.setAttribute('data-purifai-scanned', 'pending');
+
+    // Prepare text for scanning
     var combinedText = "";
-    var mainElement = null;
+    var clone = targetNode.cloneNode(true);
+    var junks = clone.querySelectorAll('style, script');
+    for (var i = 0; i < junks.length; i++) junks[i].remove();
+    var text = clone.innerText || clone.textContent || "";
+    combinedText = text.trim();
 
-    emailContainers.forEach(function (container) {
-      // Deep DOM Sanitization: Clone and strip styles/scripts
-      var clone = container.cloneNode(true);
-      var junks = clone.querySelectorAll('style, script');
-      for (var i = 0; i < junks.length; i++) {
-          junks[i].remove();
-      }
-      var text = clone.innerText || clone.textContent || "";
-      
-      if (text.trim()) {
-          combinedText += text.trim() + "\n";
-          if (container.classList.contains('a3s')) {
-              mainElement = container.closest('.gs') || container;
-          } else if (!mainElement) {
-              mainElement = container;
-          }
-      }
-    });
-
-    var trimmed = combinedText.trim();
-    if (trimmed.length < MIN_TEXT_LENGTH || trimmed === lastScannedText) {
-      isCurrentlyScanning = false;
+    if (combinedText.length < MIN_TEXT_LENGTH) {
+      targetNode.setAttribute('data-purifai-scanned', 'complete');
+      isFetching = false;
       return;
     }
 
-    var msgId = mainElement ? getMessageId(mainElement) : currentEmailId;
-    if (processedMessageIds.has(msgId)) {
-      isCurrentlyScanning = false;
-      return;
-    }
+    var mainElement = targetNode.closest('.gs') || targetNode;
+    showGlassShield(mainElement);
 
-    lastScannedText = trimmed;
-    if (mainElement) showGlassShield(mainElement);
-
-    scanText(trimmed).then(function (result) {
-      isCurrentlyScanning = false;
+    scanText(combinedText).then(function (result) {
+      // Step 4: Resolution
+      targetNode.setAttribute('data-purifai-scanned', 'complete');
+      isFetching = false;
       
-      // Step 5: Resolution - Update the stamp to complete
-      emailContainers.forEach(function (node) {
-        node.setAttribute('data-purifai-scanned', 'complete');
-      });
-
       if (mainElement) {
-          handleScanResponse(result, mainElement, trimmed);
+        handleScanResponse(result, mainElement, combinedText);
       }
+    }).catch(function() {
+      targetNode.setAttribute('data-purifai-scanned', 'complete');
+      isFetching = false;
     });
   }
 
   var observer = new MutationObserver(function (mutations) {
-    // 🚨 TRANSITION CHECK: Reset state when switching emails
+    // 🚨 TRANSITION CHECK: Reset state when switching emails (Instantly)
     var newEmailId = window.location.hash;
     if (newEmailId !== currentEmailId) {
       currentEmailId = newEmailId;
       hasTriggeredDanger = false;
-      hasScannedCurrentEmailId = false;
-      isCurrentlyScanning = false;
+      isFetching = false;
       removeActiveOverlay();
     }
 
-    // 🚨 DOM STAMPING: Find all target containers and lock them immediately
-    var targets = document.querySelectorAll('.a3s.aiL, h2.hP');
-    var hasNewContent = false;
-
-    for (var i = 0; i < targets.length; i++) {
-      var node = targets[i];
-      // Step 1: Check the stamp
-      if (node.hasAttribute('data-purifai-scanned')) continue;
-
-      // Step 2: Apply 'pending' stamp instantly to lock this node
-      node.setAttribute('data-purifai-scanned', 'pending');
-      hasNewContent = true;
-    }
-
-    // If no new/unstamped nodes were found, bail out instantly
-    if (!hasNewContent) return;
-
-    // 🚨 TRUE DEBOUNCE: Wait for Gmail's DOM noise to quiet down
-    clearTimeout(scanTimeout);
-    scanTimeout = setTimeout(function () {
-      if (isCurrentlyScanning || hasTriggeredDanger) return;
-      
-      // Re-verify targets before firing
-      var currentTargets = document.querySelectorAll('.a3s.aiL[data-purifai-scanned="pending"], h2.hP[data-purifai-scanned="pending"]');
-      if (currentTargets.length === 0) return;
-
-      isCurrentlyScanning = true;
-      doScan(currentTargets);
-    }, 250);
+    // 🚨 DUMB DEBOUNCE: Trailing Edge Singleton
+    clearTimeout(globalScanTimer);
+    globalScanTimer = setTimeout(executeScanCycle, 500);
   });
 
   // Start observing after a short delay to let the page settle
