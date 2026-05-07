@@ -53,3 +53,10 @@ htmlcov/
 *.sw?
 
 .agent/*
+
+# Security & Secrets
+*.pem
+*.crx
+.env
+.env.*
+.vercel
